@@ -19,7 +19,7 @@ const app = express();
 
 // Middleware
 app.use(cors({
-  origin: 'https://your-app-name.vercel.app', // Replace with your exact Vercel URL
+  origin: 'https://trade-web-zeta.vercel.app/', // Replace with your exact Vercel URL
   methods: ['GET', 'POST', 'PUT', 'DELETE'],  // Allowed request types
   credentials: true                           // Important if you use cookies or sessions
 }));
