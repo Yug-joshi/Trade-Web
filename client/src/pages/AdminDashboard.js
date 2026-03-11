@@ -325,7 +325,7 @@ const AdminDashboard = () => {
             setShowFlagModal(false);
             fetchDashboardData();
         } catch (error) {
-            alert(error.response?.data?.message || "Error triggering flag");
+            alert(error.response?.data?.message || "Action Denied: You cannot open a trade after 1:00 PM or close a trade after 6:00 PM.");
         }
         setIsSubmitting(false);
     };
