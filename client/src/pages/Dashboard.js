@@ -1,3 +1,4 @@
+// Import the codes 
 import React, { useEffect, useState } from 'react';
 import api from '../services/api';
 import { Line, Doughnut } from 'react-chartjs-2';

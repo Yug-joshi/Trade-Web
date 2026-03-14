@@ -83,14 +83,15 @@ const allocateTrade = async (req, res) => {
                 buy_brokerage,
                 status: "OPEN"
             });
-            
+
+            // Create Ledger Entry for the allocation
             await LedgerEntry.create({
                 mob_num: alloc.mob_num,
                 act_type: 'TRADE',
                 amt_cr: 0,
-                amt_dr: total_deduction,
-                cls_balance: user.current_balance,
-                description: `Allocated ${alloc.allocation_qty} qty of ${trade.symbol} at ₹${trade.buy_price.toFixed(2)} (Trade Value: ₹${total_value.toLocaleString()}, Buy Brokerage: ₹${buy_brokerage.toFixed(2)})`
+                amt_dr: 0,
+                cls_balance: user.current_balance, // Balance unchanged by pure allocation
+                description: `Allocated ${alloc.allocation_qty} qty of ${trade.symbol} at ₹${trade.buy_price.toFixed(2)}`
             });
         }
 
@@ -160,7 +161,10 @@ const closeTrade = async (req, res) => {
                 const return_amount = alloc.exit_value - sell_brokerage;
                 const cls_balance = user.current_balance + return_amount;
 
-                let desc = `Trade Closed: ${trade.symbol} at ₹${sell_price.toFixed(2)}. Net P&L: ₹${final_client_pnl.toFixed(2)} (Return Value: ₹${return_amount.toLocaleString()}, Sell Brokerage: ₹${sell_brokerage.toFixed(2)})`;
+                let desc = `Trade Closed Permanently (${trade.symbol}) - Base P&L: ₹${raw_client_pnl.toFixed(2)}`;
+                if (brokerage_applied > 0) {
+                    desc += ` (deducted ${user_brokerage_rate}% brokerage: ₹${brokerage_applied.toFixed(2)})`;
+                }
 
                 await LedgerEntry.create({
                     mob_num: user.mob_num,
@@ -286,7 +290,40 @@ const getClientAllocations = async (req, res) => {
 // @route   GET /api/trades/:id/allocations
 const getTradeAllocations = async (req, res) => {
     try {
-        const allocations = await AllocationTrade.find({ master_trade_id: req.params.id });
+        const mongoose = require('mongoose');
+        const allocations = await AllocationTrade.aggregate([
+            { $match: { master_trade_id: new mongoose.Types.ObjectId(req.params.id) } },
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: 'mob_num',
+                    foreignField: 'mob_num',
+                    as: 'user_details'
+                }
+            },
+            {
+                $unwind: {
+                    path: '$user_details',
+                    preserveNullAndEmptyArrays: true
+                }
+            },
+            {
+                $project: {
+                    allocation_id: 1,
+                    master_trade_id: 1,
+                    mob_num: 1,
+                    allocation_qty: 1,
+                    allocation_price: 1,
+                    total_value: 1,
+                    buy_timestamp: 1,
+                    exit_price: 1,
+                    exit_value: 1,
+                    client_pnl: 1,
+                    status: 1,
+                    user_name: '$user_details.user_name'
+                }
+            }
+        ]);
         res.status(200).json(allocations);
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -297,34 +334,58 @@ const getTradeAllocations = async (req, res) => {
 // @route   GET /api/trades/current
 const getCurrentTable = async (req, res) => {
     try {
-        const openAllocations = await AllocationTrade.find({ status: 'OPEN' }).populate('master_trade_id').lean();
+        const mongoose = require('mongoose');
+        const openAllocations = await AllocationTrade.aggregate([
+            { $match: { status: 'OPEN' } },
+            {
+                $lookup: {
+                    from: 'trades',
+                    localField: 'master_trade_id',
+                    foreignField: '_id',
+                    as: 'master_trade'
+                }
+            },
+            {
+                $unwind: {
+                    path: '$master_trade',
+                    preserveNullAndEmptyArrays: true
+                }
+            },
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: 'mob_num',
+                    foreignField: 'mob_num',
+                    as: 'user_details'
+                }
+            },
+            {
+                $unwind: {
+                    path: '$user_details',
+                    preserveNullAndEmptyArrays: true
+                }
+            }
+        ]);
+
         const currentData = [];
 
         for (const alloc of openAllocations) {
-            if (!alloc.master_trade_id) continue;
-            
-            const trade = alloc.master_trade_id;
-            const latestFlag = await DailyPriceFlag.findOne({ tradeId: trade._id }).sort({ timestamp: -1 });
+            // Find the latest active price flag for this master trade
+            const latestFlag = await DailyPriceFlag.findOne({ tradeId: alloc.master_trade_id._id }).sort({ timestamp: -1 });
 
-            const current_price = latestFlag ? latestFlag.activePrice : trade.buy_price;
-            const total_value = alloc.allocation_qty * trade.buy_price;
-            const current_value = alloc.allocation_qty * current_price;
-            
-            const unrealized_pnl = current_value - total_value;
-            
-            const user = await User.findOne({ mob_num: alloc.mob_num });
+            const current_price = latestFlag ? latestFlag.activePrice : alloc.allocation_price;
+            const unrealized_pnl = (current_price - alloc.allocation_price) * alloc.allocation_qty;
 
             currentData.push({
+                master_trade_id: alloc.master_trade_id.master_trade_id, // For key bridging on frontend
                 allocation_id: alloc.allocation_id,
-                master_trade_id: trade.master_trade_id,
-                symbol: trade.symbol,
-                mob_num: alloc.mob_num,
-                user_name: user ? user.user_name : alloc.mob_num,
+                symbol: alloc.master_trade_id.symbol,
                 total_qty: alloc.allocation_qty,
-                buy_price: trade.buy_price,
+                buy_price: alloc.allocation_price,
                 current_price,
                 unrealized_pnl,
-                date: alloc.buy_timestamp
+                date: alloc.buy_timestamp,
+                user_name: alloc.user_details?.user_name || alloc.mob_num
             });
         }
 
@@ -338,9 +399,62 @@ const getCurrentTable = async (req, res) => {
 // @route   GET /api/trades/allocations
 const getAllAllocations = async (req, res) => {
     try {
-        const allocations = await AllocationTrade.find()
-            .populate('master_trade_id', 'symbol')
-            .sort({ createdAt: -1 });
+        const allocations = await AllocationTrade.aggregate([
+            {
+                $lookup: {
+                    from: 'trades',
+                    localField: 'master_trade_id',
+                    foreignField: '_id',
+                    as: 'master_trade'
+                }
+            },
+            {
+                $unwind: {
+                    path: '$master_trade',
+                    preserveNullAndEmptyArrays: true
+                }
+            },
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: 'mob_num',
+                    foreignField: 'mob_num',
+                    as: 'user_details'
+                }
+            },
+            {
+                $unwind: {
+                    path: '$user_details',
+                    preserveNullAndEmptyArrays: true
+                }
+            },
+            {
+                $project: {
+                    _id: 1,
+                    allocation_id: 1,
+                    master_trade_id: {
+                        _id: '$master_trade._id',
+                        symbol: '$master_trade.symbol',
+                        buy_price: '$master_trade.buy_price',
+                        buy_brokerage: '$master_trade.buy_brokerage',
+                        sell_brokerage: '$master_trade.sell_brokerage'
+                    },
+                    mob_num: 1,
+                    allocation_qty: 1,
+                    allocation_price: 1,
+                    total_value: 1,
+                    buy_timestamp: 1,
+                    exit_price: 1,
+                    exit_value: 1,
+                    client_pnl: 1,
+                    status: 1,
+                    user_name: '$user_details.user_name',
+                    user_brokerage: { $ifNull: ['$user_details.brokerage', 2] },
+                    createdAt: 1
+                }
+            }
+        ]).sort({ createdAt: -1 });
+
         res.status(200).json(allocations);
     } catch (error) {
         res.status(500).json({ message: error.message });

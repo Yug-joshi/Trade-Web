@@ -6,13 +6,44 @@ const DailyPriceFlag = require('../models/DailyPriceFlag');
 // @route   GET /api/ledger
 const getLedgerEntries = async (req, res) => {
     try {
-        let query = {};
+        const mongoose = require('mongoose');
+        let match = {};
         // If the user is not an admin, restrict query to their own mobile number
         if (req.user.role !== 'admin') {
-            query.mob_num = req.user.mob_num;
+            match.mob_num = req.user.mob_num;
         }
 
-        const entries = await LedgerEntry.find(query).sort({ entry_date: -1 });
+        const entries = await LedgerEntry.aggregate([
+            { $match: match },
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: 'mob_num',
+                    foreignField: 'mob_num',
+                    as: 'user_details'
+                }
+            },
+            {
+                $unwind: {
+                    path: '$user_details',
+                    preserveNullAndEmptyArrays: true
+                }
+            },
+            {
+                $project: {
+                    _id: 1,
+                    mob_num: 1,
+                    user_name: '$user_details.user_name',
+                    act_type: 1,
+                    amt_cr: 1,
+                    amt_dr: 1,
+                    cls_balance: 1,
+                    description: 1,
+                    entry_date: 1
+                }
+            }
+        ]).sort({ entry_date: -1 });
+
         res.status(200).json(entries);
     } catch (error) {
         res.status(500).json({ message: error.message });
