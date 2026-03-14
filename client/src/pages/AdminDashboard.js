@@ -50,7 +50,6 @@ const AdminDashboard = () => {
 
     const [showCloseModal, setShowCloseModal] = useState(false);
     const [closePrice, setClosePrice] = useState('');
-    const [closeBrokerage, setCloseBrokerage] = useState('');
 
     // Trigger Flag Modal
     const [showFlagModal, setShowFlagModal] = useState(false);
@@ -58,17 +57,21 @@ const AdminDashboard = () => {
     const [flagInputs, setFlagInputs] = useState({ day: 1, activePrice: '' });
 
     // Form States
-    const [newUser, setNewUser] = useState({ user_name: '', mob_num: '', password: '', percentage: '', brokerage: 2, current_balance: 100000 });
+    const [newUser, setNewUser] = useState({ user_name: '', mob_num: '', password: '', brokerage: 2, current_balance: 100000 });
     const [editingUser, setEditingUser] = useState(null);
     const [fundsUser, setFundsUser] = useState(null);
     const [fundsAmount, setFundsAmount] = useState('');
     const [fundsDescription, setFundsDescription] = useState('');
     const [selectedUserProfile, setSelectedUserProfile] = useState(null);
-    const [newTrade, setNewTrade] = useState({ symbol: '', total_qty: '', buy_price: '', buy_brokerage: '' });
+    const [newTrade, setNewTrade] = useState({ symbol: '', total_qty: '', buy_price: '' });
 
     // User Search State
     const [userSearchInput, setUserSearchInput] = useState('');
     const [userSearch, setUserSearch] = useState('');
+    const [userStatusFilter, setUserStatusFilter] = useState('ALL');
+
+    const [currentSearchInput, setCurrentSearchInput] = useState('');
+    const [currentSearch, setCurrentSearch] = useState('');
 
     // Global Funds Form State
     const [showGlobalFundsModal, setShowGlobalFundsModal] = useState(false);
@@ -130,10 +133,14 @@ const AdminDashboard = () => {
 
     const handleCreateUser = async (e) => {
         e.preventDefault();
+        if (newUser.mob_num.length !== 10) {
+            alert("Mobile number must be exactly 10 digits");
+            return;
+        }
         try {
             await api.post('/users/create', newUser);
             alert("User created successfully!");
-            setNewUser({ user_name: '', mob_num: '', password: '', percentage: '', brokerage: 2, current_balance: 100000 });
+            setNewUser({ user_name: '', mob_num: '', password: '', brokerage: 2, current_balance: 100000 });
             setShowUserModal(false);
             fetchDashboardData();
         } catch (error) {
@@ -143,11 +150,14 @@ const AdminDashboard = () => {
 
     const handleEditUser = async (e) => {
         e.preventDefault();
+        if (editingUser.mob_num.length !== 10) {
+            alert("Mobile number must be exactly 10 digits");
+            return;
+        }
         try {
             // Ensure numbers are properly parsed before sending
             const payload = {
                 ...editingUser,
-                percentage: Number(editingUser.percentage || 0),
                 brokerage: editingUser.brokerage ? Number(editingUser.brokerage) : 2
             };
 
@@ -212,7 +222,7 @@ const AdminDashboard = () => {
         try {
             await api.post('/trades', newTrade);
             alert("Master Trade Executed!");
-            setNewTrade({ symbol: '', total_qty: '', buy_price: '', buy_brokerage: '' });
+            setNewTrade({ symbol: '', total_qty: '', buy_price: '' });
             setShowTradeModal(false);
             fetchDashboardData();
         } catch (error) {
@@ -294,14 +304,13 @@ const AdminDashboard = () => {
         const liveData = currentTrades.find(ct => ct.master_trade_id === trade.master_trade_id);
         setSelectedTrade({ ...trade, live_price: liveData ? liveData.current_price : null });
         setClosePrice('');
-        setCloseBrokerage('');
         setShowCloseModal(true);
     };
 
     const submitCloseTrade = async () => {
         setIsSubmitting(true);
         try {
-            await api.post(`/trades/${selectedTrade._id}/close`, { sell_price: Number(closePrice), sell_brokerage: Number(closeBrokerage) });
+            await api.post(`/trades/${selectedTrade._id}/close`, { sell_price: Number(closePrice) });
             alert("Trade closed successfully! Ledger updated.");
             setShowCloseModal(false);
             fetchDashboardData();
@@ -385,6 +394,9 @@ const AdminDashboard = () => {
 
     const sortedUsers = useMemo(() => {
         let filtered = users.filter(u => u.role !== 'admin');
+        if (userStatusFilter !== 'ALL') {
+            filtered = filtered.filter(u => u.status === userStatusFilter);
+        }
         if (userSearch.trim()) {
             const lowerQuery = userSearch.toLowerCase();
             filtered = filtered.filter(u =>
@@ -407,7 +419,13 @@ const AdminDashboard = () => {
         return sortedData(filtered, 'buy_timestamp');
     }, [masterTrades, sortConfig, masterFilterStatus, masterSearch]);
 
-    const sortedCurrentTrades = useMemo(() => sortedData(currentTrades, 'date'), [currentTrades, sortConfig]);
+    const sortedCurrentTrades = useMemo(() => {
+        let filtered = currentTrades;
+        if (currentSearch.trim()) {
+            filtered = filtered.filter(t => t.symbol?.toLowerCase().includes(currentSearch.toLowerCase()));
+        }
+        return sortedData(filtered, 'date');
+    }, [currentTrades, sortConfig, currentSearch]);
 
     const sortedAllocations = useMemo(() => {
         let filtered = allocations.filter(a => {
@@ -464,6 +482,15 @@ const AdminDashboard = () => {
                                         Search
                                     </button>
                                 </div>
+                                <select
+                                    value={userStatusFilter}
+                                    onChange={(e) => setUserStatusFilter(e.target.value)}
+                                    style={{ padding: '8px 12px', border: '1px solid var(--border)', borderRadius: '6px', background: 'var(--bg-card)', color: 'var(--text-main)', outline: 'none' }}
+                                >
+                                    <option value="ALL">All Status</option>
+                                    <option value="active">Active</option>
+                                    <option value="inactive">Inactive</option>
+                                </select>
                                 <button className="btn" style={{ background: '#10b981', color: 'white', border: 'none' }} onClick={() => { setGlobalFundsType('add'); setShowGlobalFundsModal(true); }}>
                                     <i className="fas fa-arrow-down"></i> Add Funds
                                 </button>
@@ -483,7 +510,8 @@ const AdminDashboard = () => {
                                         <th style={thStyle} onClick={() => requestSort('client_id')}>Client ID {sortConfig.key === 'client_id' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
                                         <th style={thStyle} onClick={() => requestSort('user_name')}>Name {sortConfig.key === 'user_name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
                                         <th style={thStyle} onClick={() => requestSort('mob_num')}>Mobile Num {sortConfig.key === 'mob_num' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
-                                        <th style={thStyle} onClick={() => requestSort('percentage')}>Alloc % {sortConfig.key === 'percentage' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
+                                        <th style={thStyle} onClick={() => requestSort('initial_balance')}>Initial Bal {sortConfig.key === 'initial_balance' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
+                                        <th style={thStyle} onClick={() => requestSort('added_funds')}>Added Funds {sortConfig.key === 'added_funds' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
                                         <th style={thStyle} onClick={() => requestSort('brokerage')}>Brokerage % {sortConfig.key === 'brokerage' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
                                         <th style={thStyle} onClick={() => requestSort('current_balance')}>Current Balance {sortConfig.key === 'current_balance' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
                                         <th style={thStyle} onClick={() => requestSort('status')}>Status {sortConfig.key === 'status' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
@@ -506,7 +534,8 @@ const AdminDashboard = () => {
                                                 {u.user_name}
                                             </td>
                                             <td style={tdStyle}>{u.mob_num}</td>
-                                            <td style={tdStyle}>{u.percentage}%</td>
+                                            <td style={{ ...tdStyle, fontFamily: 'monospace' }}>₹ {(u.initial_balance || 0).toLocaleString()}</td>
+                                            <td style={{ ...tdStyle, fontFamily: 'monospace', color: 'var(--success)' }}>₹ {(u.added_funds || 0).toLocaleString()}</td>
                                             <td style={tdStyle}>{u.brokerage !== undefined ? u.brokerage : 2}%</td>
                                             <td style={{ ...tdStyle, fontFamily: 'monospace' }}>₹ {(u.current_balance || 0).toLocaleString()}</td>
                                             <td style={tdStyle}>
@@ -643,15 +672,35 @@ const AdminDashboard = () => {
                     <div className="card">
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                             <h2 style={{ fontSize: '1.2rem' }}>Current Open Positions (Live via Daily Active Price)</h2>
-                            <button className="btn" onClick={fetchCurrentTable}>
-                                <i className="fas fa-sync"></i> Refresh
-                            </button>
+                            <div style={{ display: 'flex', gap: '10px' }}>
+                                <div style={{ display: 'flex' }}>
+                                    <input
+                                        type="text"
+                                        placeholder="Search Symbol..."
+                                        value={currentSearchInput}
+                                        onChange={(e) => setCurrentSearchInput(e.target.value)}
+                                        onKeyDown={(e) => e.key === 'Enter' && setCurrentSearch(currentSearchInput)}
+                                        style={{ padding: '8px 12px', border: '1px solid var(--border)', borderRadius: '6px 0 0 6px', background: 'var(--bg-card)', color: 'var(--text-main)', outline: 'none' }}
+                                    />
+                                    <button
+                                        className="btn btn-primary"
+                                        onClick={() => setCurrentSearch(currentSearchInput)}
+                                        style={{ borderRadius: '0 6px 6px 0', borderLeft: 'none', padding: '8px 12px' }}
+                                    >
+                                        Search
+                                    </button>
+                                </div>
+                                <button className="btn" onClick={fetchCurrentTable}>
+                                    <i className="fas fa-sync"></i> Refresh
+                                </button>
+                            </div>
                         </div>
                         <div style={{ overflowX: 'auto' }}>
                             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                                 <thead>
                                     <tr>
                                         <th style={thStyle} onClick={() => requestSort('date')}>Date {sortConfig.key === 'date' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
+                                        <th style={thStyle} onClick={() => requestSort('user_name')}>User {sortConfig.key === 'user_name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
                                         <th style={thStyle} onClick={() => requestSort('symbol')}>Symbol {sortConfig.key === 'symbol' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
                                         <th style={thStyle} onClick={() => requestSort('total_qty')}>Total Qty {sortConfig.key === 'total_qty' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
                                         <th style={thStyle} onClick={() => requestSort('buy_price')}>Avg Buy Price {sortConfig.key === 'buy_price' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
@@ -663,8 +712,9 @@ const AdminDashboard = () => {
                                     {sortedCurrentTrades.length === 0 ? (
                                         <tr><td colSpan="6" style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)' }}>No open trades or fetching data...</td></tr>
                                     ) : sortedCurrentTrades.map(t => (
-                                        <tr key={t.master_trade_id}>
+                                        <tr key={t.master_trade_id + t.mob_num}>
                                             <td style={tdStyle}>{new Date(t.date).toLocaleString()}</td>
+                                            <td style={tdStyle}>{t.user_name}</td>
                                             <td style={{ ...tdStyle, fontWeight: 'bold' }}>{t.symbol}</td>
                                             <td style={tdStyle}>{t.total_qty}</td>
                                             <td style={{ ...tdStyle, fontFamily: 'monospace' }}>₹{t.buy_price.toFixed(2)}</td>
@@ -736,7 +786,7 @@ const AdminDashboard = () => {
                                             <td style={{ ...tdStyle, fontWeight: 'bold' }}>{users.find(u => String(u.mob_num) === String(a.mob_num))?.user_name || a.mob_num}</td>
                                             <td style={tdStyle}>{a.allocation_qty}</td>
                                             <td style={tdStyle}>
-                                                <span style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem', background: a.status === 'CLOSED' ? 'rgba(239,68,68,0.1)' : 'rgba(79,70,229,0.1)', color: a.status === 'CLOSED' ? 'var(--danger)' : 'var(--primary)' }}>
+                                                <span style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem', background: a.status === 'CLOSED' ? 'rgba(239,68,68,0.1)' : 'rgba(16, 185, 129, 0.1)', color: a.status === 'CLOSED' ? 'var(--danger)' : 'var(--success)' }}>
                                                     {a.status}
                                                 </span>
                                             </td>
@@ -799,13 +849,9 @@ const AdminDashboard = () => {
                             </div>
                         </div>
                         <div className="card" style={{ minHeight: '350px', alignItems: 'center' }}>
-                            <h3 style={{ fontSize: '1rem', marginBottom: '1rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', alignSelf: 'flex-start' }}>Global By User Allocation</h3>
-                            <div style={{ width: '100%', height: '100%', maxHeight: '250px', display: 'flex', justifyContent: 'center' }}>
-                                {users.length > 0 ? (
-                                    <Doughnut options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }} data={doughnutData} />
-                                ) : (
-                                    <p className="text-muted" style={{ marginTop: '50px' }}>Add users to see chart</p>
-                                )}
+                            <h3 style={{ fontSize: '1rem', marginBottom: '1rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', alignSelf: 'flex-start' }}>Global Allocation</h3>
+                            <div style={{ width: '100%', padding: '1rem', background: 'var(--bg-body)', borderRadius: '8px', border: '1px dashed var(--border)', flexGrow: 1, display: 'grid', placeItems: 'center', textAlign: 'center' }}>
+                                <p className="text-muted">Allocations dynamically managed per trade execution.</p>
                             </div>
                         </div>
                     </div>
@@ -829,9 +875,6 @@ const AdminDashboard = () => {
 
                             <label style={{ fontSize: '0.85rem', fontWeight: '600' }}>Password</label>
                             <input style={inputStyle} type="password" value={newUser.password} onChange={e => setNewUser({ ...newUser, password: e.target.value })} required />
-
-                            <label style={{ fontSize: '0.85rem', fontWeight: '600' }}>Default Allocation (%)</label>
-                            <input style={inputStyle} type="number" value={newUser.percentage} onChange={e => setNewUser({ ...newUser, percentage: e.target.value })} />
 
                             <label style={{ fontSize: '0.85rem', fontWeight: '600' }}>Brokerage Fee (%)</label>
                             <input style={inputStyle} type="number" value={newUser.brokerage} onChange={e => setNewUser({ ...newUser, brokerage: e.target.value })} />
@@ -862,9 +905,6 @@ const AdminDashboard = () => {
 
                             <label style={{ fontSize: '0.85rem', fontWeight: '600' }}>New Password (leave blank to keep current)</label>
                             <input style={inputStyle} type="password" placeholder="***" onChange={e => setEditingUser({ ...editingUser, password: e.target.value })} />
-
-                            <label style={{ fontSize: '0.85rem', fontWeight: '600' }}>Default Allocation (%)</label>
-                            <input style={inputStyle} type="number" value={editingUser.percentage} onChange={e => setEditingUser({ ...editingUser, percentage: e.target.value })} />
 
                             <label style={{ fontSize: '0.85rem', fontWeight: '600' }}>Brokerage Fee (%)</label>
                             <input style={inputStyle} type="number" value={editingUser.brokerage !== undefined ? editingUser.brokerage : 2} onChange={e => setEditingUser({ ...editingUser, brokerage: e.target.value })} />
@@ -915,9 +955,6 @@ const AdminDashboard = () => {
 
                             <label style={{ fontSize: '0.85rem', fontWeight: '600' }}>Buy Price</label>
                             <input style={inputStyle} type="number" step="0.01" value={newTrade.buy_price} onChange={e => setNewTrade({ ...newTrade, buy_price: e.target.value })} required />
-
-                            <label style={{ fontSize: '0.85rem', fontWeight: '600' }}>Buy Brokerage</label>
-                            <input style={inputStyle} type="number" step="0.01" value={newTrade.buy_brokerage} onChange={e => setNewTrade({ ...newTrade, buy_brokerage: e.target.value })} required />
 
                             <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
                                 <button type="submit" disabled={isSubmitting} className="btn btn-primary" style={{ flex: 1 }}>{isSubmitting ? 'Wait...' : 'Create Trade'}</button>
@@ -993,9 +1030,6 @@ const AdminDashboard = () => {
                         )}
                         <label style={{ fontSize: '0.85rem', fontWeight: '600' }}>Sell Price</label>
                         <input style={inputStyle} type="number" step="0.01" value={closePrice} onChange={e => setClosePrice(e.target.value)} required />
-
-                        <label style={{ fontSize: '0.85rem', fontWeight: '600' }}>Sell Brokerage</label>
-                        <input style={inputStyle} type="number" step="0.01" value={closeBrokerage} onChange={e => setCloseBrokerage(e.target.value)} required />
 
                         <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
                             <button onClick={submitCloseTrade} disabled={!closePrice || isSubmitting} className="btn btn-primary" style={{ flex: 1, background: 'var(--danger)', border: 'none' }}>{isSubmitting ? 'Wait...' : 'Confirm Close'}</button>
@@ -1164,7 +1198,8 @@ const AdminDashboard = () => {
                             <p><strong>Client ID:</strong> {selectedUserProfile.client_id}</p>
                             <p><strong>Mobile:</strong> {selectedUserProfile.mob_num}</p>
                             <p><strong>Current Balance:</strong> ₹ {(selectedUserProfile.current_balance || 0).toLocaleString()}</p>
-                            <p><strong>Defaults Alloc %:</strong> {selectedUserProfile.percentage}%</p>
+                            <p><strong>Initial Balance:</strong> ₹ {(selectedUserProfile.initial_balance || 0).toLocaleString()}</p>
+                            <p><strong>Added Funds:</strong> ₹ {(selectedUserProfile.added_funds || 0).toLocaleString()}</p>
                         </div>
                         <button className="btn btn-primary" style={{ width: '100%' }} onClick={() => setShowUserProfileModal(false)}>Close</button>
                     </div>
