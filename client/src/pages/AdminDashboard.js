@@ -58,13 +58,13 @@ const AdminDashboard = () => {
     const [flagInputs, setFlagInputs] = useState({ day: 1, activePrice: '' });
 
     // Form States
-    const [newUser, setNewUser] = useState({ user_name: '', mob_num: '', password: '', percentage: '', brokerage: 2, current_balance: 100000 });
+    const [newUser, setNewUser] = useState({ user_name: '', mob_num: '', password: '', brokerage: 2, current_balance: 100000 });
     const [editingUser, setEditingUser] = useState(null);
     const [fundsUser, setFundsUser] = useState(null);
     const [fundsAmount, setFundsAmount] = useState('');
     const [fundsDescription, setFundsDescription] = useState('');
     const [selectedUserProfile, setSelectedUserProfile] = useState(null);
-    const [newTrade, setNewTrade] = useState({ symbol: '', total_qty: '', buy_price: '', buy_brokerage: '' });
+    const [newTrade, setNewTrade] = useState({ symbol: '', total_qty: '', buy_price: '' });
 
     // Expandable Rows State
     const [expandedRows, setExpandedRows] = useState(new Set());
@@ -138,10 +138,13 @@ const AdminDashboard = () => {
 
     const handleCreateUser = async (e) => {
         e.preventDefault();
+        if (newUser.mob_num.length !== 10) {
+            return alert("Mobile number must be exactly 10 digits.");
+        }
         try {
             await api.post('/users/create', newUser);
             alert("User created successfully!");
-            setNewUser({ user_name: '', mob_num: '', password: '', percentage: '', brokerage: 2, current_balance: 100000 });
+            setNewUser({ user_name: '', mob_num: '', password: '', brokerage: 2, current_balance: 100000 });
             setShowUserModal(false);
             fetchDashboardData();
         } catch (error) {
@@ -151,11 +154,13 @@ const AdminDashboard = () => {
 
     const handleEditUser = async (e) => {
         e.preventDefault();
+        if (editingUser.mob_num.length !== 10) {
+            return alert("Mobile number must be exactly 10 digits.");
+        }
         try {
             // Ensure numbers are properly parsed before sending
             const payload = {
                 ...editingUser,
-                percentage: Number(editingUser.percentage || 0),
                 brokerage: editingUser.brokerage ? Number(editingUser.brokerage) : 2
             };
 
@@ -220,7 +225,7 @@ const AdminDashboard = () => {
         try {
             await api.post('/trades', newTrade);
             alert("Master Trade Executed!");
-            setNewTrade({ symbol: '', total_qty: '', buy_price: '', buy_brokerage: '' });
+            setNewTrade({ symbol: '', total_qty: '', buy_price: '' });
             setShowTradeModal(false);
             fetchDashboardData();
         } catch (error) {
@@ -630,37 +635,94 @@ const AdminDashboard = () => {
                                 </thead>
                                 <tbody>
                                     {sortedMasterTrades.map(t => (
-                                        <tr key={t._id} style={{ cursor: 'pointer' }} onClick={() => openTradeDetails(t)}>
-                                            <td style={tdStyle}>{new Date(t.buy_timestamp).toLocaleString()}</td>
-                                            <td style={{ ...tdStyle, fontWeight: 'bold' }}>{t.symbol}</td>
-                                            <td style={tdStyle}>{t.total_qty}</td>
-                                            <td style={{ ...tdStyle, fontFamily: 'monospace' }}>₹ {(t.buy_price || 0).toFixed(2)}</td>
-                                            <td style={{ ...tdStyle, fontFamily: 'monospace' }}>₹ {(t.buy_brokerage || 0).toFixed(2)}</td>
-                                            <td style={{ ...tdStyle, fontFamily: 'monospace', color: t.sell_price ? 'var(--text-main)' : 'var(--text-muted)' }}>
-                                                {t.sell_price ? `₹ ${t.sell_price.toFixed(2)}` : '-'}
-                                            </td>
-                                            <td style={{ ...tdStyle, fontFamily: 'monospace', color: t.status === 'CLOSED' ? 'var(--text-main)' : 'var(--text-muted)' }}>
-                                                {t.status === 'CLOSED' ? `₹ ${(t.sell_brokerage || 0).toFixed(2)}` : '-'}
-                                            </td>
-                                            <td style={{ ...tdStyle, fontFamily: 'monospace', fontWeight: 'bold' }}>₹ {(t.total_cost || 0).toLocaleString()}</td>
-                                            <td style={tdStyle}>
-                                                <span style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem', background: t.status === 'CLOSED' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)', color: t.status === 'CLOSED' ? 'var(--danger)' : 'var(--success)' }}>
-                                                    {t.status}
-                                                </span>
-                                            </td>
-                                            <td style={tdStyle} onClick={(e) => e.stopPropagation()}>
-                                                {t.status === 'OPEN' && (
-                                                    <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
-                                                        <button className="btn" style={{ padding: '5px 10px', fontSize: '0.8rem', background: '#10b981', color: '#fff', border: 'none' }} onClick={() => openFlagModal(t, 'TEM_OPEN')}>Open Today</button>
-                                                        <button className="btn" style={{ padding: '5px 10px', fontSize: '0.8rem', background: '#ef4444', color: '#fff', border: 'none' }} onClick={() => openFlagModal(t, 'TEM_CLOSE')}>Close Today</button>
-                                                        {(t.allocated_qty || 0) < t.total_qty && (
-                                                            <button className="btn btn-primary" style={{ padding: '5px 10px', fontSize: '0.8rem' }} onClick={() => openAllocateModal(t)}>Allocate</button>
-                                                        )}
-                                                        <button className="btn" style={{ padding: '5px 10px', fontSize: '0.8rem', background: 'var(--danger)', color: '#fff', border: 'none' }} onClick={() => openCloseModal(t)}>Close</button>
-                                                    </div>
-                                                )}
-                                            </td>
-                                        </tr>
+                                        <React.Fragment key={t._id}>
+                                            <tr style={{ cursor: 'pointer', background: expandedRows.has(t._id) ? 'var(--bg-body)' : 'inherit' }} onClick={() => toggleRow(t._id)}>
+                                                <td style={tdStyle}>
+                                                    <i className={`fas fa-chevron-${expandedRows.has(t._id) ? 'down' : 'right'}`} style={{ marginRight: '8px', color: 'var(--primary)', width: '12px' }}></i>
+                                                    {new Date(t.buy_timestamp).toLocaleString()}
+                                                </td>
+                                                <td style={{ ...tdStyle, fontWeight: 'bold' }}>{t.symbol}</td>
+                                                <td style={tdStyle}>{t.total_qty}</td>
+                                                <td style={{ ...tdStyle, fontFamily: 'monospace' }}>₹ {(t.buy_price || 0).toFixed(2)}</td>
+                                                <td style={{ ...tdStyle, fontFamily: 'monospace' }}>₹ {(t.buy_brokerage || 0).toFixed(2)}</td>
+                                                <td style={{ ...tdStyle, fontFamily: 'monospace', fontWeight: 'bold' }}>
+                                                    {(() => {
+                                                        const liveData = currentTrades.find(ct => ct.master_trade_id === t.master_trade_id);
+                                                        return liveData ? (
+                                                            <span style={{ color: '#3b82f6' }}>₹ {liveData.current_price.toFixed(2)}</span>
+                                                        ) : '-';
+                                                    })()}
+                                                </td>
+                                                <td style={{ ...tdStyle, fontFamily: 'monospace', color: t.sell_price ? 'var(--text-main)' : 'var(--text-muted)' }}>
+                                                    {t.sell_price ? `₹ ${t.sell_price.toFixed(2)}` : '-'}
+                                                </td>
+                                                <td style={{ ...tdStyle, fontFamily: 'monospace', color: t.status === 'CLOSED' ? 'var(--text-main)' : 'var(--text-muted)' }}>
+                                                    {t.status === 'CLOSED' ? `₹ ${(t.sell_brokerage || 0).toFixed(2)}` : '-'}
+                                                </td>
+                                                <td style={{ ...tdStyle, fontFamily: 'monospace', fontWeight: 'bold' }}>₹ {(t.total_cost || 0).toLocaleString()}</td>
+                                                <td style={tdStyle}>
+                                                    <span style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem', background: t.status === 'CLOSED' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)', color: t.status === 'CLOSED' ? 'var(--danger)' : 'var(--success)' }}>
+                                                        {t.status}
+                                                    </span>
+                                                </td>
+                                                <td style={tdStyle} onClick={(e) => e.stopPropagation()}>
+                                                    {t.status === 'OPEN' && (
+                                                        <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
+                                                            <button className="btn" title="View Allocations" style={{ padding: '5px 10px', fontSize: '0.8rem', background: 'var(--primary)', color: '#fff', border: 'none' }} onClick={(e) => { e.stopPropagation(); openTradeDetails(t); }}><i className="fas fa-eye"></i></button>
+                                                            <button className="btn" style={{ padding: '5px 10px', fontSize: '0.8rem', background: '#ef4444', color: '#fff', border: 'none' }} onClick={(e) => { e.stopPropagation(); openFlagModal(t, 'TEM_CLOSE'); }}>M to M</button>
+                                                            {(t.allocated_qty || 0) < t.total_qty && (
+                                                                <button className="btn btn-primary" style={{ padding: '5px 10px', fontSize: '0.8rem' }} onClick={(e) => { e.stopPropagation(); openAllocateModal(t); }}>Allocate</button>
+                                                            )}
+                                                            <button className="btn" style={{ padding: '5px 10px', fontSize: '0.8rem', background: 'var(--danger)', color: '#fff', border: 'none' }} onClick={(e) => { e.stopPropagation(); openCloseModal(t); }}>Close</button>
+                                                        </div>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                            {(expandedRows.has(t._id)) ? (() => {
+                                                const tradeAllocations = allocations.filter(a => String(a.master_trade_id?._id || a.master_trade_id) === String(t._id));
+                                                if (tradeAllocations.length === 0) return null;
+                                                return (
+                                                    <tr style={{ background: 'rgba(0,0,0,0.1)' }}>
+                                                        <td colSpan="11" style={{ padding: '20px 40px' }}>
+                                                            <div style={{ display: 'flex', gap: '15px', alignItems: 'center', marginBottom: '10px' }}>
+                                                                <i className="fas fa-sitemap" style={{ color: 'var(--text-muted)' }}></i>
+                                                                <h4 style={{ margin: 0, fontSize: '0.95rem', color: 'var(--text-muted)' }}>Allocations for {t.symbol}</h4>
+                                                            </div>
+                                                            <table style={{ width: '100%', borderCollapse: 'collapse', background: 'var(--bg-card)', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border)' }}>
+                                                                <thead>
+                                                                    <tr style={{ background: 'var(--bg-body)' }}>
+                                                                        <th style={{ ...thStyle, fontSize: '0.75rem', padding: '8px 12px' }}>Alloc ID</th>
+                                                                        <th style={{ ...thStyle, fontSize: '0.75rem', padding: '8px 12px' }}>User</th>
+                                                                        <th style={{ ...thStyle, fontSize: '0.75rem', padding: '8px 12px' }}>Qty</th>
+                                                                        <th style={{ ...thStyle, fontSize: '0.75rem', padding: '8px 12px' }}>Price</th>
+                                                                        <th style={{ ...thStyle, fontSize: '0.75rem', padding: '8px 12px' }}>Status</th>
+                                                                        <th style={{ ...thStyle, fontSize: '0.75rem', padding: '8px 12px' }}>Client P&L</th>
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody>
+                                                                    {tradeAllocations.map(a => (
+                                                                        <tr key={a._id} style={{ borderBottom: '1px solid var(--border)' }}>
+                                                                            <td style={{ ...tdStyle, padding: '8px 12px', fontSize: '0.8rem', fontFamily: 'monospace', color: 'var(--primary)' }}>{a.allocation_id}</td>
+                                                                            <td style={{ ...tdStyle, padding: '8px 12px', fontSize: '0.85rem', fontWeight: 'bold' }}>{a.user_name || a.mob_num}</td>
+                                                                            <td style={{ ...tdStyle, padding: '8px 12px', fontSize: '0.85rem' }}>{a.allocation_qty}</td>
+                                                                            <td style={{ ...tdStyle, padding: '8px 12px', fontSize: '0.85rem', fontFamily: 'monospace' }}>₹{a.allocation_price.toFixed(2)}</td>
+                                                                            <td style={{ ...tdStyle, padding: '8px 12px', fontSize: '0.85rem' }}>
+                                                                                <span style={{ padding: '2px 6px', borderRadius: '4px', fontSize: '0.65rem', background: a.status === 'CLOSED' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)', color: a.status === 'CLOSED' ? 'var(--danger)' : 'var(--success)' }}>
+                                                                                    {a.status}
+                                                                                </span>
+                                                                            </td>
+                                                                            <td style={{ ...tdStyle, padding: '8px 12px', fontSize: '0.85rem', fontFamily: 'monospace', color: a.client_pnl >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                                                                                {a.status === 'CLOSED' ? `₹${a.client_pnl}` : '-'}
+                                                                            </td>
+                                                                        </tr>
+                                                                    ))}
+                                                                </tbody>
+                                                            </table>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })() : null}
+                                        </React.Fragment>
                                     ))}
                                 </tbody>
                             </table>
@@ -758,29 +820,29 @@ const AdminDashboard = () => {
                                 <thead>
                                     <tr>
                                         <th style={thStyle} onClick={() => requestSort('buy_timestamp')}>Date {sortConfig.key === 'buy_timestamp' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
-                                        <th style={thStyle} onClick={() => requestSort('allocation_id')}>Alloc ID {sortConfig.key === 'allocation_id' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
+                                        <th style={thStyle} onClick={() => requestSort('user_name')}>User Name {sortConfig.key === 'user_name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
                                         <th style={thStyle} onClick={() => requestSort('master_trade_id.symbol')}>Symbol {sortConfig.key === 'master_trade_id.symbol' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
-                                        <th style={thStyle} onClick={() => requestSort('mob_num')}>User Name {sortConfig.key === 'mob_num' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
                                         <th style={thStyle} onClick={() => requestSort('allocation_qty')}>Qty {sortConfig.key === 'allocation_qty' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
-                                        <th style={thStyle} onClick={() => requestSort('status')}>Status {sortConfig.key === 'status' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
-                                        <th style={thStyle} onClick={() => requestSort('client_pnl')}>Client P&L {sortConfig.key === 'client_pnl' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
+                                        <th style={thStyle}>Buy Price</th>
+                                        <th style={thStyle}>Buy Brok</th>
+                                        <th style={thStyle}>Sell Price</th>
+                                        <th style={thStyle}>Sell Brok</th>
+                                        <th style={thStyle} onClick={() => requestSort('client_pnl')}>Realized P&L {sortConfig.key === 'client_pnl' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {sortedAllocations.map(a => (
                                         <tr key={a._id}>
                                             <td style={tdStyle}>{new Date(a.buy_timestamp).toLocaleString()}</td>
-                                            <td style={{ ...tdStyle, fontSize: '0.8rem', fontFamily: 'monospace', color: 'var(--primary)' }}>{a.allocation_id}</td>
+                                            <td style={{ ...tdStyle, fontWeight: 'bold' }}>{a.user_name || users.find(u => String(u.mob_num).replace(/^0+/, '') === String(a.mob_num).replace(/^0+/, ''))?.user_name || a.mob_num}</td>
                                             <td style={{ ...tdStyle, fontWeight: 'bold' }}>{a.master_trade_id?.symbol}</td>
-                                            <td style={{ ...tdStyle, fontWeight: 'bold' }}>{users.find(u => u.mob_num === a.mob_num)?.user_name || a.mob_num}</td>
                                             <td style={tdStyle}>{a.allocation_qty}</td>
-                                            <td style={tdStyle}>
-                                                <span style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem', background: a.status === 'CLOSED' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)', color: a.status === 'CLOSED' ? 'var(--danger)' : 'var(--success)' }}>
-                                                    {a.status}
-                                                </span>
-                                            </td>
-                                            <td style={{ ...tdStyle, fontFamily: 'monospace', color: a.client_pnl >= 0 ? 'var(--success)' : 'var(--danger)' }}>
-                                                {a.status === 'CLOSED' ? `₹${a.client_pnl}` : '-'}
+                                            <td style={{ ...tdStyle, fontFamily: 'monospace' }}>₹{(a.allocation_price || 0).toFixed(2)}</td>
+                                            <td style={{ ...tdStyle, fontFamily: 'monospace' }}>₹{(a.master_trade_id?.buy_brokerage || 0).toFixed(2)}</td>
+                                            <td style={{ ...tdStyle, fontFamily: 'monospace' }}>{a.status === 'CLOSED' ? `₹${(a.exit_price || 0).toFixed(2)}` : '-'}</td>
+                                            <td style={{ ...tdStyle, fontFamily: 'monospace' }}>{a.status === 'CLOSED' ? `₹${(a.master_trade_id?.sell_brokerage || 0).toFixed(2)}` : '-'}</td>
+                                            <td style={{ ...tdStyle, fontFamily: 'monospace', fontWeight: 'bold', color: a.status === 'CLOSED' ? (a.client_pnl >= 0 ? 'var(--success)' : 'var(--danger)') : 'inherit' }}>
+                                                {a.status === 'CLOSED' ? `${a.client_pnl >= 0 ? '+' : ''}₹${(a.client_pnl || 0).toFixed(2)}` : '-'}
                                             </td>
                                         </tr>
                                     ))}
@@ -809,7 +871,7 @@ const AdminDashboard = () => {
                                     {sortedLedger.map(l => (
                                         <tr key={l._id}>
                                             <td style={tdStyle}>{new Date(l.entry_date).toLocaleString()}</td>
-                                            <td style={{ ...tdStyle, fontWeight: 'bold' }}>{l.mob_num}</td>
+                                            <td style={{ ...tdStyle, fontWeight: 'bold' }}>{l.user_name || users.find(u => String(u.mob_num).replace(/^0+/, '') === String(l.mob_num).replace(/^0+/, ''))?.user_name || l.mob_num}</td>
                                             <td style={tdStyle}>{l.description}</td>
                                             <td style={{ ...tdStyle, color: 'var(--success)', fontFamily: 'monospace' }}>{l.amt_cr > 0 ? `₹ ${l.amt_cr.toLocaleString()}` : '-'}</td>
                                             <td style={{ ...tdStyle, color: 'var(--danger)', fontFamily: 'monospace' }}>{l.amt_dr > 0 ? `₹ ${l.amt_dr.toLocaleString()}` : '-'}</td>
@@ -864,13 +926,10 @@ const AdminDashboard = () => {
                             <input style={inputStyle} type="text" value={newUser.user_name} onChange={e => setNewUser({ ...newUser, user_name: e.target.value })} required />
 
                             <label style={{ fontSize: '0.85rem', fontWeight: '600' }}>Mobile Number</label>
-                            <input style={inputStyle} type="text" value={newUser.mob_num} onChange={e => setNewUser({ ...newUser, mob_num: e.target.value })} required />
+                            <input style={inputStyle} type="text" value={newUser.mob_num} onChange={e => setNewUser({ ...newUser, mob_num: e.target.value.replace(/\D/g, '').slice(0, 10) })} required />
 
                             <label style={{ fontSize: '0.85rem', fontWeight: '600' }}>Password</label>
                             <input style={inputStyle} type="password" value={newUser.password} onChange={e => setNewUser({ ...newUser, password: e.target.value })} required />
-
-                            <label style={{ fontSize: '0.85rem', fontWeight: '600' }}>Default Allocation (%)</label>
-                            <input style={inputStyle} type="number" value={newUser.percentage} onChange={e => setNewUser({ ...newUser, percentage: e.target.value })} />
 
                             <label style={{ fontSize: '0.85rem', fontWeight: '600' }}>Brokerage Fee (%)</label>
                             <input style={inputStyle} type="number" value={newUser.brokerage} onChange={e => setNewUser({ ...newUser, brokerage: e.target.value })} />
@@ -897,13 +956,10 @@ const AdminDashboard = () => {
                             <input style={inputStyle} type="text" value={editingUser.user_name} onChange={e => setEditingUser({ ...editingUser, user_name: e.target.value })} required />
 
                             <label style={{ fontSize: '0.85rem', fontWeight: '600' }}>Mobile Number</label>
-                            <input style={inputStyle} type="text" value={editingUser.mob_num} onChange={e => setEditingUser({ ...editingUser, mob_num: e.target.value })} required />
+                            <input style={inputStyle} type="text" value={editingUser.mob_num} onChange={e => setEditingUser({ ...editingUser, mob_num: e.target.value.replace(/\D/g, '').slice(0, 10) })} required />
 
                             <label style={{ fontSize: '0.85rem', fontWeight: '600' }}>New Password (leave blank to keep current)</label>
                             <input style={inputStyle} type="password" placeholder="***" onChange={e => setEditingUser({ ...editingUser, password: e.target.value })} />
-
-                            <label style={{ fontSize: '0.85rem', fontWeight: '600' }}>Default Allocation (%)</label>
-                            <input style={inputStyle} type="number" value={editingUser.percentage} onChange={e => setEditingUser({ ...editingUser, percentage: e.target.value })} />
 
                             <label style={{ fontSize: '0.85rem', fontWeight: '600' }}>Brokerage Fee (%)</label>
                             <input style={inputStyle} type="number" value={editingUser.brokerage !== undefined ? editingUser.brokerage : 2} onChange={e => setEditingUser({ ...editingUser, brokerage: e.target.value })} />
@@ -955,8 +1011,6 @@ const AdminDashboard = () => {
                             <label style={{ fontSize: '0.85rem', fontWeight: '600' }}>Buy Price</label>
                             <input style={inputStyle} type="number" step="0.01" value={newTrade.buy_price} onChange={e => setNewTrade({ ...newTrade, buy_price: e.target.value })} required />
 
-                            <label style={{ fontSize: '0.85rem', fontWeight: '600' }}>Buy Brokerage</label>
-                            <input style={inputStyle} type="number" step="0.01" value={newTrade.buy_brokerage} onChange={e => setNewTrade({ ...newTrade, buy_brokerage: e.target.value })} required />
 
                             <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
                                 <button type="submit" disabled={isSubmitting} className="btn btn-primary" style={{ flex: 1 }}>{isSubmitting ? 'Wait...' : 'Create Trade'}</button>

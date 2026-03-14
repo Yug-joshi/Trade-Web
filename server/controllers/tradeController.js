@@ -409,7 +409,10 @@ const getAllAllocations = async (req, res) => {
                     allocation_id: 1,
                     master_trade_id: {
                         _id: '$master_trade._id',
-                        symbol: '$master_trade.symbol'
+                        symbol: '$master_trade.symbol',
+                        buy_price: '$master_trade.buy_price',
+                        buy_brokerage: '$master_trade.buy_brokerage',
+                        sell_brokerage: '$master_trade.sell_brokerage'
                     },
                     mob_num: 1,
                     allocation_qty: 1,
