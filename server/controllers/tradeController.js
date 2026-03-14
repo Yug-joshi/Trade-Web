@@ -8,7 +8,7 @@ const DailyPriceFlag = require('../models/DailyPriceFlag');
 // @route   POST /api/trades
 const createTrade = async (req, res) => {
     try {
-        const { symbol, total_qty, buy_price, buy_brokerage } = req.body;
+        const { symbol, total_qty, buy_price } = req.body;
         const total_cost = total_qty * buy_price;
 
         const master_trade_id = "MT-" + Date.now() + Math.floor(Math.random() * 1000);
@@ -18,10 +18,19 @@ const createTrade = async (req, res) => {
             symbol,
             total_qty,
             buy_price,
-            buy_brokerage: buy_brokerage ? Number(buy_brokerage) : 0,
+            buy_brokerage: 0,
             total_cost,
             allocation_tab: false,
             status: "OPEN"
+        });
+
+        await LedgerEntry.create({
+            mob_num: req.user.mob_num,
+            act_type: 'TRADE',
+            amt_cr: 0,
+            amt_dr: total_cost,
+            cls_balance: 0,
+            description: `Master Trade Executed: ${symbol} (${total_qty} qty)`
         });
 
         res.status(201).json(trade);
@@ -56,6 +65,14 @@ const allocateTrade = async (req, res) => {
             const allocation_id = "AL-" + Date.now() + Math.floor(Math.random() * 1000);
             const total_value = alloc.allocation_qty * trade.buy_price;
 
+            const user_brokerage_rate = user.brokerage !== undefined ? user.brokerage : 2;
+            const buy_brokerage = total_value * (user_brokerage_rate / 100);
+
+            // Deduct total value + buy brokerage from user balance immediately
+            const total_deduction = total_value + buy_brokerage;
+            user.current_balance -= total_deduction;
+            await user.save();
+
             allocationDocs.push({
                 allocation_id,
                 master_trade_id: trade._id,
@@ -63,6 +80,7 @@ const allocateTrade = async (req, res) => {
                 allocation_qty: alloc.allocation_qty,
                 allocation_price: trade.buy_price,
                 total_value,
+                buy_brokerage,
                 status: "OPEN"
             });
 
@@ -97,7 +115,7 @@ const allocateTrade = async (req, res) => {
 const closeTrade = async (req, res) => {
     try {
         const { id } = req.params;
-        const { sell_price, sell_brokerage } = req.body;
+        const { sell_price } = req.body;
 
         const trade = await Trade.findById(id);
         if (!trade) return res.status(404).json({ message: "Trade not found" });
@@ -105,16 +123,18 @@ const closeTrade = async (req, res) => {
 
         // Calculate Master P&L
         trade.sell_price = sell_price;
-        trade.sell_brokerage = sell_brokerage ? Number(sell_brokerage) : 0;
+        trade.sell_brokerage = 0;
         trade.sell_timestamp = new Date();
         trade.total_exit_value = trade.total_qty * sell_price;
-        trade.master_pnl = trade.total_exit_value - trade.total_cost - (trade.buy_brokerage || 0) - trade.sell_brokerage;
+        trade.master_pnl = trade.total_exit_value - trade.total_cost;
         trade.status = 'CLOSED';
 
         // Find & Close all allocations for this trade
         const allocations = await AllocationTrade.find({ master_trade_id: trade._id, status: 'OPEN' });
 
         for (const alloc of allocations) {
+            const user = await User.findOne({ mob_num: alloc.mob_num });
+
             alloc.exit_price = sell_price;
             alloc.sell_timestamp = new Date();
             alloc.exit_value = alloc.allocation_qty * sell_price;
@@ -122,28 +142,24 @@ const closeTrade = async (req, res) => {
             // Core P&L difference
             const raw_client_pnl = alloc.exit_value - alloc.total_value;
 
-            // Fetch User to determine bespoke brokerage rate
-            const user = await User.findOne({ mob_num: alloc.mob_num });
-
-            // Apply unique brokerage ONLY if the trade was profitable
-            let final_client_pnl = raw_client_pnl;
-            let brokerage_applied = 0;
+            // Apply unique brokerage 
             let user_brokerage_rate = user && user.brokerage !== undefined ? user.brokerage : 2; // Default 2%
+            const sell_brokerage = alloc.exit_value * (user_brokerage_rate / 100);
+            
+            const total_brokerage = (alloc.buy_brokerage || 0) + sell_brokerage;
+            const final_client_pnl = raw_client_pnl - total_brokerage;
 
-            if (raw_client_pnl > 0) {
-                brokerage_applied = raw_client_pnl * (user_brokerage_rate / 100);
-                final_client_pnl = raw_client_pnl - brokerage_applied;
-            }
-
+            alloc.sell_brokerage = sell_brokerage;
             alloc.client_pnl = final_client_pnl;
             alloc.status = 'CLOSED';
             await alloc.save();
 
             // Create Ledger Entry and update User balance
             if (user) {
-                const amt_cr = final_client_pnl > 0 ? final_client_pnl : 0;
-                const amt_dr = final_client_pnl < 0 ? Math.abs(final_client_pnl) : 0;
-                const cls_balance = user.current_balance + amt_cr - amt_dr;
+                // Since we deducted the entire trade value & buy brokerage at allocation, 
+                // we now credit the total exit value minus sell brokerage back to the balance.
+                const return_amount = alloc.exit_value - sell_brokerage;
+                const cls_balance = user.current_balance + return_amount;
 
                 let desc = `Trade Closed Permanently (${trade.symbol}) - Base P&L: ₹${raw_client_pnl.toFixed(2)}`;
                 if (brokerage_applied > 0) {
@@ -153,8 +169,8 @@ const closeTrade = async (req, res) => {
                 await LedgerEntry.create({
                     mob_num: user.mob_num,
                     act_type: 'TRADE',
-                    amt_cr,
-                    amt_dr,
+                    amt_cr: return_amount,
+                    amt_dr: 0,
                     cls_balance,
                     description: desc
                 });
@@ -163,6 +179,15 @@ const closeTrade = async (req, res) => {
                 await user.save();
             }
         }
+
+        await LedgerEntry.create({
+            mob_num: req.user.mob_num, // admin
+            act_type: 'TRADE',
+            amt_cr: trade.total_exit_value,
+            amt_dr: 0,
+            cls_balance: 0,
+            description: `Master Trade Closed: ${trade.symbol}. Gross P&L: ₹${trade.master_pnl.toFixed(2)}`
+        });
 
         await trade.save();
         res.status(200).json({ message: "Trade closed successfully", trade });

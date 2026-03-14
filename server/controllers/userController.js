@@ -8,7 +8,7 @@ const jwt = require("jsonwebtoken");
 // @route   POST /api/users/create
 const registerUser = async (req, res) => {
   try {
-    const { user_name, mob_num, password, percentage, brokerage } = req.body;
+    const { user_name, mob_num, password, brokerage } = req.body;
 
     const existing = await User.findOne({ mob_num });
     if (existing) return res.status(400).json({ msg: "User already exists" });
@@ -21,8 +21,9 @@ const registerUser = async (req, res) => {
       user_name,
       mob_num,
       password: hashedPassword,
-      percentage,
       brokerage: brokerage !== undefined ? brokerage : 2,
+      initial_balance: req.body.current_balance || 0,
+      added_funds: 0,
       current_balance: req.body.current_balance || 0,
       role: "user",
       status: "active"
@@ -111,7 +112,7 @@ const getUsers = async (req, res) => {
 // @route   PUT /api/users/:id
 const updateUser = async (req, res) => {
   try {
-    const { user_name, mob_num, password, percentage, brokerage, status } = req.body;
+    const { user_name, mob_num, password, brokerage, status } = req.body;
     const user = await User.findById(req.params.id);
 
     if (!user) return res.status(404).json({ msg: "User not found" });
@@ -121,7 +122,6 @@ const updateUser = async (req, res) => {
 
     user.user_name = user_name || user.user_name;
     user.mob_num = mob_num || user.mob_num;
-    user.percentage = percentage !== undefined ? percentage : user.percentage;
     user.brokerage = brokerage !== undefined ? brokerage : user.brokerage;
     user.status = status || user.status;
 
@@ -154,6 +154,7 @@ const addFunds = async (req, res) => {
     if (!user) return res.status(404).json({ msg: "User not found" });
 
     user.current_balance += Number(amount);
+    user.added_funds = (user.added_funds || 0) + Number(amount);
 
     await LedgerEntry.create({
       mob_num: user.mob_num,

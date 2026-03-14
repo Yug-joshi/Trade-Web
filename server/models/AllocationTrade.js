@@ -14,6 +14,8 @@ const allocationSchema = new mongoose.Schema({
     allocation_qty: { type: Number, required: true },
     allocation_price: { type: Number, required: true },
     total_value: { type: Number, required: true },
+    buy_brokerage: { type: Number, default: 0 },
+    sell_brokerage: { type: Number, default: 0 },
     buy_timestamp: { type: Date, default: Date.now },
     exit_price: { type: Number },
     exit_value: { type: Number },

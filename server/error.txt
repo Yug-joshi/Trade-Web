@@ -1,6 +1,0 @@
-[dotenv@17.3.1] injecting env (3) from .env -- tip: 🔐 prevent building .env in docker: https://dotenvx.com/prebuild
-[dotenv@17.3.1] injecting env (0) from .env -- tip: 🛠️  run anywhere with `dotenvx run -- yourcommand`
-Trying to connect with URI: mongodb+srv://chandan:chandan11@feelfree.mplt9kx.mongodb.net/tradin_web?appName=FeelFree
-Server running on port 5000
-MongoDB Connected: ac-ogvldln-shard-00-02.mplt9kx.mongodb.net
-^C

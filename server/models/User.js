@@ -32,6 +32,14 @@ const userSchema = new mongoose.Schema({
     type: Number,
     default: 2 // default to 2%
   },
+  initial_balance: {
+    type: Number,
+    default: 0
+  },
+  added_funds: {
+    type: Number,
+    default: 0
+  },
   current_balance: {
     type: Number,
     default: 0

@@ -15,8 +15,11 @@ const PnL = () => {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const { data } = await api.get('/trades/my-allocations/list');
-                processPnL(data);
+                const [allocsRes, ledgerRes] = await Promise.all([
+                    api.get('/trades/my-allocations/list'),
+                    api.get('/ledger')
+                ]);
+                processPnL(allocsRes.data, ledgerRes.data);
             } catch (error) {
                 console.error("Error fetching data:", error);
             }
@@ -24,9 +27,38 @@ const PnL = () => {
         fetchData();
     }, []);
 
-    const processPnL = (data) => {
+    const processPnL = (data, ledgerData) => {
         // Filter only Completed trades
         const completed = data.filter(t => t.status === 'CLOSED');
+
+        // Extract "Funds Added" from ledger
+        const fundsAdded = ledgerData.filter(l => 
+            l.act_type === 'CREDIT' && 
+            (l.description.includes('Fund Added') || l.description.includes('Funds Added') || l.description.includes('Balance Added'))
+        );
+
+        const combinedTableData = [
+            ...completed.map(t => ({
+                id: t._id,
+                date: new Date(t.sell_timestamp || t.buy_timestamp),
+                script: t.master_trade_id?.symbol,
+                type: 'TRADE',
+                status: t.status,
+                qty: t.allocation_qty,
+                price: t.exit_price || '-',
+                net_pnl: t.client_pnl || 0
+            })),
+            ...fundsAdded.map(l => ({
+                id: l._id,
+                date: new Date(l.entry_date),
+                script: 'FUND ADDED',
+                type: 'FUND',
+                status: 'COMPLETED',
+                qty: '-',
+                price: '-',
+                net_pnl: l.amt_cr
+            }))
+        ].sort((a, b) => b.date - a.date);
 
         let total = 0;
         let wins = 0;
@@ -36,7 +68,7 @@ const PnL = () => {
             if ((t.client_pnl || 0) > 0) wins++;
         });
 
-        setTrades(completed);
+        setTrades(combinedTableData);
         setStats({
             totalRealized: total,
             totalTrades: completed.length,
@@ -93,19 +125,19 @@ const PnL = () => {
                         </thead>
                         <tbody>
                             {trades.map(trade => (
-                                <tr key={trade._id}>
-                                    <td style={{ padding: '14px 12px', borderBottom: '1px solid var(--border)' }}>{new Date(trade.sell_timestamp || trade.buy_timestamp).toLocaleDateString()}</td>
+                                <tr key={trade.id}>
+                                    <td style={{ padding: '14px 12px', borderBottom: '1px solid var(--border)' }}>{trade.date.toLocaleDateString()}</td>
                                     <td style={{ padding: '14px 12px', borderBottom: '1px solid var(--border)' }}>
-                                        <div style={{ fontWeight: '600' }}>{trade.master_trade_id?.symbol}</div>
-                                        <div style={{ fontSize: '0.75rem' }} className="text-muted">SELL</div>
+                                        <div style={{ fontWeight: '600' }}>{trade.script}</div>
+                                        {trade.type === 'TRADE' && <div style={{ fontSize: '0.75rem' }} className="text-muted">SELL</div>}
                                     </td>
                                     <td style={{ padding: '14px 12px', borderBottom: '1px solid var(--border)' }}>
                                         <span style={{ background: 'var(--bg-body)', padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: '600' }}>{trade.status}</span>
                                     </td>
-                                    <td style={{ padding: '14px 12px', borderBottom: '1px solid var(--border)', textAlign: 'right', fontFamily: 'monospace' }}>{trade.allocation_qty}</td>
-                                    <td style={{ padding: '14px 12px', borderBottom: '1px solid var(--border)', textAlign: 'right', fontFamily: 'monospace' }}>{trade.exit_price || '-'}</td>
-                                    <td style={{ padding: '14px 12px', borderBottom: '1px solid var(--border)', textAlign: 'right', fontWeight: '700' }} className={(trade.client_pnl || 0) >= 0 ? "text-up" : "text-down"}>
-                                        {(trade.client_pnl || 0) > 0 ? '+' : ''}{(trade.client_pnl || 0).toLocaleString()}
+                                    <td style={{ padding: '14px 12px', borderBottom: '1px solid var(--border)', textAlign: 'right', fontFamily: 'monospace' }}>{trade.qty}</td>
+                                    <td style={{ padding: '14px 12px', borderBottom: '1px solid var(--border)', textAlign: 'right', fontFamily: 'monospace' }}>{trade.price}</td>
+                                    <td style={{ padding: '14px 12px', borderBottom: '1px solid var(--border)', textAlign: 'right', fontWeight: '700' }} className={trade.type === 'FUND' ? "text-up" : (trade.net_pnl >= 0 ? "text-up" : "text-down")}>
+                                        {trade.net_pnl > 0 ? '+' : ''}{trade.net_pnl.toLocaleString()}
                                     </td>
                                 </tr>
                             ))}
