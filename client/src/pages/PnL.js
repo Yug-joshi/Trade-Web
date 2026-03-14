@@ -1,4 +1,3 @@
-// Import Files
 import React, { useEffect, useState } from 'react';
 import api from '../services/api';
 import Layout from '../components/Layout';
