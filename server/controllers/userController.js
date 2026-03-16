@@ -10,8 +10,17 @@ const registerUser = async (req, res) => {
   try {
     const { user_name, mob_num, password, brokerage } = req.body;
 
-    const existing = await User.findOne({ mob_num });
-    if (existing) return res.status(400).json({ msg: "User already exists" });
+    const ADMIN_MOBILE = "1234567890";
+    if (mob_num === ADMIN_MOBILE) {
+      return res.status(400).json({ msg: "This mobile number is reserved for Admin" });
+    }
+
+    const existingUser = await User.findOne({ mob_num });
+    const existingAdmin = await Admin.findOne({ mob_num });
+    
+    if (existingUser || existingAdmin) {
+      return res.status(400).json({ msg: "Mobile number already in use" });
+    }
 
     const hashedPassword = await bcrypt.hash(password, 10);
     const client_id = "CID" + Math.floor(100000 + Math.random() * 900000);
@@ -99,7 +108,7 @@ const getUsers = async (req, res) => {
     
     // Add role "admin" to admins explicitly and merge lists
     const mergedUsers = [
-      ...admins.map(a => ({ ...a, role: 'admin' })),
+      ...admins.map(a => ({ ...a, user_name: 'Admin', role: 'admin' })),
       ...users
     ];
     
@@ -117,6 +126,18 @@ const updateUser = async (req, res) => {
     const user = await User.findById(req.params.id);
 
     if (!user) return res.status(404).json({ msg: "User not found" });
+
+    const ADMIN_MOBILE = "1234567890";
+    if (mob_num && mob_num !== user.mob_num) {
+      if (mob_num === ADMIN_MOBILE) {
+        return res.status(400).json({ msg: "This mobile number is reserved for Admin" });
+      }
+      const existingUser = await User.findOne({ mob_num });
+      const existingAdmin = await Admin.findOne({ mob_num });
+      if (existingUser || existingAdmin) {
+        return res.status(400).json({ msg: "Mobile number already in use" });
+      }
+    }
 
     const oldMobNum = user.mob_num;
     const isMobNumChanging = mob_num && mob_num !== oldMobNum;

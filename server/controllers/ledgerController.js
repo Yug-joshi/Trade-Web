@@ -20,20 +20,28 @@ const getLedgerEntries = async (req, res) => {
                     from: 'users',
                     localField: 'mob_num',
                     foreignField: 'mob_num',
-                    as: 'user_details'
+                    as: 'user_info'
                 }
             },
             {
-                $unwind: {
-                    path: '$user_details',
-                    preserveNullAndEmptyArrays: true
+                $lookup: {
+                    from: 'admins',
+                    localField: 'mob_num',
+                    foreignField: 'mob_num',
+                    as: 'admin_info'
                 }
             },
             {
                 $project: {
                     _id: 1,
                     mob_num: 1,
-                    user_name: '$user_details.user_name',
+                    user_name: {
+                        $cond: {
+                            if: { $gt: [{ $size: '$admin_info' }, 0] },
+                            then: 'Admin',
+                            else: { $ifNull: [{ $arrayElemAt: ['$user_info.user_name', 0] }, '$mob_num'] }
+                        }
+                    },
                     act_type: 1,
                     amt_cr: 1,
                     amt_dr: 1,
