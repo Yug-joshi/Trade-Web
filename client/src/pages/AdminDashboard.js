@@ -57,7 +57,7 @@ const AdminDashboard = () => {
     const [flagInputs, setFlagInputs] = useState({ day: 1, activePrice: '' });
 
     // Form States
-    const [newUser, setNewUser] = useState({ user_name: '', mob_num: '', password: '', brokerage: 2, current_balance: 100000 });
+    const [newUser, setNewUser] = useState({ user_name: '', mob_num: '', password: '', brokerage: '', current_balance: '' });
     const [editingUser, setEditingUser] = useState(null);
     const [fundsUser, setFundsUser] = useState(null);
     const [fundsAmount, setFundsAmount] = useState('');
