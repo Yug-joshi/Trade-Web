@@ -50,7 +50,6 @@ const AdminDashboard = () => {
 
     const [showCloseModal, setShowCloseModal] = useState(false);
     const [closePrice, setClosePrice] = useState('');
-    const [closeBrokerage, setCloseBrokerage] = useState('');
 
     // Trigger Flag Modal
     const [showFlagModal, setShowFlagModal] = useState(false);
@@ -310,14 +309,13 @@ const AdminDashboard = () => {
         const liveData = currentTrades.find(ct => ct.master_trade_id === trade.master_trade_id);
         setSelectedTrade({ ...trade, live_price: liveData ? liveData.current_price : null });
         setClosePrice('');
-        setCloseBrokerage('');
         setShowCloseModal(true);
     };
 
     const submitCloseTrade = async () => {
         setIsSubmitting(true);
         try {
-            await api.post(`/trades/${selectedTrade._id}/close`, { sell_price: Number(closePrice), sell_brokerage: Number(closeBrokerage) });
+            await api.post(`/trades/${selectedTrade._id}/close`, { sell_price: Number(closePrice) });
             alert("Trade closed successfully! Ledger updated.");
             setShowCloseModal(false);
             fetchDashboardData();
@@ -532,7 +530,7 @@ const AdminDashboard = () => {
                                         <th style={thStyle} onClick={() => requestSort('client_id')}>Client ID {sortConfig.key === 'client_id' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
                                         <th style={thStyle} onClick={() => requestSort('user_name')}>Name {sortConfig.key === 'user_name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
                                         <th style={thStyle} onClick={() => requestSort('mob_num')}>Mobile Num {sortConfig.key === 'mob_num' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
-                                        <th style={thStyle} onClick={() => requestSort('percentage')}>Alloc % {sortConfig.key === 'percentage' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
+
                                         <th style={thStyle} onClick={() => requestSort('brokerage')}>Brokerage % {sortConfig.key === 'brokerage' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
                                         <th style={thStyle} onClick={() => requestSort('current_balance')}>Current Balance {sortConfig.key === 'current_balance' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
                                         <th style={thStyle} onClick={() => requestSort('status')}>Status {sortConfig.key === 'status' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
@@ -555,7 +553,7 @@ const AdminDashboard = () => {
                                                 {u.user_name}
                                             </td>
                                             <td style={tdStyle}>{u.mob_num}</td>
-                                            <td style={tdStyle}>{u.percentage}%</td>
+
                                             <td style={tdStyle}>{u.brokerage !== undefined ? u.brokerage : 2}%</td>
                                             <td style={{ ...tdStyle, fontFamily: 'monospace' }}>₹ {(u.current_balance || 0).toLocaleString()}</td>
                                             <td style={tdStyle}>
@@ -691,31 +689,51 @@ const AdminDashboard = () => {
                                                             <table style={{ width: '100%', borderCollapse: 'collapse', background: 'var(--bg-card)', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border)' }}>
                                                                 <thead>
                                                                     <tr style={{ background: 'var(--bg-body)' }}>
-                                                                        <th style={{ ...thStyle, fontSize: '0.75rem', padding: '8px 12px' }}>Alloc ID</th>
                                                                         <th style={{ ...thStyle, fontSize: '0.75rem', padding: '8px 12px' }}>User</th>
                                                                         <th style={{ ...thStyle, fontSize: '0.75rem', padding: '8px 12px' }}>Qty</th>
-                                                                        <th style={{ ...thStyle, fontSize: '0.75rem', padding: '8px 12px' }}>Price</th>
                                                                         <th style={{ ...thStyle, fontSize: '0.75rem', padding: '8px 12px' }}>Status</th>
-                                                                        <th style={{ ...thStyle, fontSize: '0.75rem', padding: '8px 12px' }}>Client P&L</th>
+                                                                        <th style={{ ...thStyle, fontSize: '0.75rem', padding: '8px 12px' }}>Financial Details (Ledger Entries)</th>
                                                                     </tr>
                                                                 </thead>
                                                                 <tbody>
-                                                                    {tradeAllocations.map(a => (
-                                                                        <tr key={a._id} style={{ borderBottom: '1px solid var(--border)' }}>
-                                                                            <td style={{ ...tdStyle, padding: '8px 12px', fontSize: '0.8rem', fontFamily: 'monospace', color: 'var(--primary)' }}>{a.allocation_id}</td>
-                                                                            <td style={{ ...tdStyle, padding: '8px 12px', fontSize: '0.85rem', fontWeight: 'bold' }}>{a.user_name || a.mob_num}</td>
-                                                                            <td style={{ ...tdStyle, padding: '8px 12px', fontSize: '0.85rem' }}>{a.allocation_qty}</td>
-                                                                            <td style={{ ...tdStyle, padding: '8px 12px', fontSize: '0.85rem', fontFamily: 'monospace' }}>₹{a.allocation_price.toFixed(2)}</td>
-                                                                            <td style={{ ...tdStyle, padding: '8px 12px', fontSize: '0.85rem' }}>
-                                                                                <span style={{ padding: '2px 6px', borderRadius: '4px', fontSize: '0.65rem', background: a.status === 'CLOSED' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)', color: a.status === 'CLOSED' ? 'var(--danger)' : 'var(--success)' }}>
-                                                                                    {a.status}
-                                                                                </span>
-                                                                            </td>
-                                                                            <td style={{ ...tdStyle, padding: '8px 12px', fontSize: '0.85rem', fontFamily: 'monospace', color: a.client_pnl >= 0 ? 'var(--success)' : 'var(--danger)' }}>
-                                                                                {a.status === 'CLOSED' ? `₹${a.client_pnl}` : '-'}
-                                                                            </td>
-                                                                        </tr>
-                                                                    ))}
+                                                                    {tradeAllocations.map(a => {
+                                                                        const relatedLedger = ledger.filter(l =>
+                                                                            String(l.trade_id || '') === String(t._id) &&
+                                                                            String(l.mob_num).replace(/^0+/, '') === String(a.mob_num).replace(/^0+/, '')
+                                                                        );
+
+                                                                        return (
+                                                                            <tr key={a._id} style={{ borderBottom: '1px solid var(--border)' }}>
+                                                                                <td style={{ ...tdStyle, padding: '8px 12px', fontSize: '0.85rem', fontWeight: 'bold', verticalAlign: 'top', width: '150px' }}>
+                                                                                    {a.user_name || a.mob_num}
+                                                                                </td>
+                                                                                <td style={{ ...tdStyle, padding: '8px 12px', fontSize: '0.85rem', verticalAlign: 'top', width: '80px' }}>
+                                                                                    {a.allocation_qty}
+                                                                                </td>
+                                                                                <td style={{ ...tdStyle, padding: '8px 12px', fontSize: '0.85rem', verticalAlign: 'top', width: '100px' }}>
+                                                                                    <span style={{ padding: '2px 6px', borderRadius: '4px', fontSize: '0.65rem', background: a.status === 'CLOSED' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)', color: a.status === 'CLOSED' ? 'var(--danger)' : 'var(--success)' }}>
+                                                                                        {a.status}
+                                                                                    </span>
+                                                                                </td>
+                                                                                <td style={{ ...tdStyle, padding: '8px 12px', fontSize: '0.8rem' }}>
+                                                                                    {relatedLedger.length > 0 ? (
+                                                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                                                                                            {relatedLedger.map((entry, idx) => (
+                                                                                                <div key={idx} style={{ padding: '6px', background: 'var(--bg-body)', borderRadius: '4px', borderLeft: `3px solid ${entry.amt_cr > 0 ? 'var(--success)' : 'var(--danger)'}` }}>
+                                                                                                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '2px' }}>
+                                                                                                        {new Date(entry.entry_date).toLocaleString()} | {entry.amt_cr > 0 ? 'Credit' : 'Debit'}: ₹{entry.amt_cr || entry.amt_dr}
+                                                                                                    </div>
+                                                                                                    <div style={{ fontWeight: '500' }}>{entry.description}</div>
+                                                                                                </div>
+                                                                                            ))}
+                                                                                        </div>
+                                                                                    ) : (
+                                                                                        <span className="text-muted">No specific ledger entries found for this trade link.</span>
+                                                                                    )}
+                                                                                </td>
+                                                                            </tr>
+                                                                        );
+                                                                    })}
                                                                 </tbody>
                                                             </table>
                                                         </td>
@@ -755,6 +773,7 @@ const AdminDashboard = () => {
                                         <th style={thStyle} onClick={() => requestSort('user_name')}>User Name {sortConfig.key === 'user_name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
                                         <th style={thStyle} onClick={() => requestSort('total_qty')}>Alloc Qty {sortConfig.key === 'total_qty' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
                                         <th style={thStyle} onClick={() => requestSort('buy_price')}>Avg Buy Price {sortConfig.key === 'buy_price' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
+                                        <th style={thStyle}>Buy Value</th>
                                         <th style={thStyle} onClick={() => requestSort('current_price')}>CMP (Live) {sortConfig.key === 'current_price' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
                                         <th style={thStyle} onClick={() => requestSort('unrealized_pnl')}>Unrealized P/L {sortConfig.key === 'unrealized_pnl' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
                                     </tr>
@@ -769,6 +788,7 @@ const AdminDashboard = () => {
                                             <td style={{ ...tdStyle, fontWeight: 'bold' }}>{t.user_name}</td>
                                             <td style={tdStyle}>{t.total_qty}</td>
                                             <td style={{ ...tdStyle, fontFamily: 'monospace' }}>₹{t.buy_price.toFixed(2)}</td>
+                                            <td style={{ ...tdStyle, fontFamily: 'monospace' }}>₹{(t.buy_price * t.total_qty).toFixed(2)}</td>
                                             <td style={{ ...tdStyle, fontFamily: 'monospace', fontWeight: 'bold' }}>₹{t.current_price.toFixed(2)}</td>
                                             <td style={{ ...tdStyle, fontFamily: 'monospace', fontWeight: 'bold', color: t.unrealized_pnl >= 0 ? 'var(--success)' : 'var(--danger)' }}>
                                                 {t.unrealized_pnl >= 0 ? '+' : ''}₹{t.unrealized_pnl.toFixed(2)}
@@ -1087,7 +1107,8 @@ const AdminDashboard = () => {
                                             <div style={{ padding: '8px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(59, 130, 246, 0.1)' }}>
                                                 <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--primary)' }}>AVAILABLE USERS</span>
                                                 <button
-                                                    onClick={(e) => {
+                                                    onMouseDown={(e) => {
+                                                        e.preventDefault();
                                                         e.stopPropagation();
                                                         setAllocationInputs(prev => [...prev, ...filteredSearchUsers.map(u => ({
                                                             mob_num: u.mob_num,
@@ -1104,7 +1125,8 @@ const AdminDashboard = () => {
                                             {filteredSearchUsers.map(u => (
                                                 <div
                                                     key={u._id}
-                                                    onClick={() => {
+                                                    onMouseDown={(e) => {
+                                                        e.preventDefault();
                                                         setAllocationInputs(prev => [...prev, {
                                                             mob_num: u.mob_num,
                                                             name: u.user_name,
@@ -1189,8 +1211,7 @@ const AdminDashboard = () => {
                         <label style={{ fontSize: '0.85rem', fontWeight: '600' }}>Sell Price</label>
                         <input style={inputStyle} type="number" step="0.01" value={closePrice} onChange={e => setClosePrice(e.target.value)} required />
 
-                        <label style={{ fontSize: '0.85rem', fontWeight: '600' }}>Sell Brokerage</label>
-                        <input style={inputStyle} type="number" step="0.01" value={closeBrokerage} onChange={e => setCloseBrokerage(e.target.value)} required />
+                        {/* Brokerage Price will be calculated automatically based on user specific % */}
 
                         <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
                             <button onClick={submitCloseTrade} disabled={!closePrice || isSubmitting} className="btn btn-primary" style={{ flex: 1, background: 'var(--danger)', border: 'none' }}>{isSubmitting ? 'Wait...' : 'Confirm Close'}</button>
@@ -1359,7 +1380,7 @@ const AdminDashboard = () => {
                             <p><strong>Client ID:</strong> {selectedUserProfile.client_id}</p>
                             <p><strong>Mobile:</strong> {selectedUserProfile.mob_num}</p>
                             <p><strong>Current Balance:</strong> ₹ {(selectedUserProfile.current_balance || 0).toLocaleString()}</p>
-                            <p><strong>Defaults Alloc %:</strong> {selectedUserProfile.percentage}%</p>
+
                         </div>
                         <button className="btn btn-primary" style={{ width: '100%' }} onClick={() => setShowUserProfileModal(false)}>Close</button>
                     </div>

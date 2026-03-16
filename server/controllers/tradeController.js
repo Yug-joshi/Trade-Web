@@ -30,6 +30,7 @@ const createTrade = async (req, res) => {
             amt_cr: 0,
             amt_dr: total_cost,
             cls_balance: 0,
+            trade_id: trade._id,
             description: `Master Trade Executed: ${symbol} (${total_qty} qty)`
         });
 
@@ -89,9 +90,10 @@ const allocateTrade = async (req, res) => {
                 mob_num: alloc.mob_num,
                 act_type: 'TRADE',
                 amt_cr: 0,
-                amt_dr: 0,
-                cls_balance: user.current_balance, // Balance unchanged by pure allocation
-                description: `Allocated ${alloc.allocation_qty} qty of ${trade.symbol} at ₹${trade.buy_price.toFixed(2)}`
+                amt_dr: total_deduction,
+                cls_balance: user.current_balance,
+                trade_id: trade._id,
+                description: `Allocated ${alloc.allocation_qty} of ${trade.symbol} | Price: ₹${trade.buy_price.toFixed(2)} | Value: ₹${total_value.toFixed(2)} | Brokerage: ${user_brokerage_rate}% (₹${buy_brokerage.toFixed(2)}) | Net Total: ₹${total_deduction.toFixed(2)}`
             });
         }
 
@@ -145,7 +147,7 @@ const closeTrade = async (req, res) => {
             // Apply unique brokerage 
             let user_brokerage_rate = user && user.brokerage !== undefined ? user.brokerage : 2; // Default 2%
             const sell_brokerage = alloc.exit_value * (user_brokerage_rate / 100);
-            
+
             const total_brokerage = (alloc.buy_brokerage || 0) + sell_brokerage;
             const final_client_pnl = raw_client_pnl - total_brokerage;
 
@@ -161,10 +163,7 @@ const closeTrade = async (req, res) => {
                 const return_amount = alloc.exit_value - sell_brokerage;
                 const cls_balance = user.current_balance + return_amount;
 
-                let desc = `Trade Closed Permanently (${trade.symbol}) - Base P&L: ₹${raw_client_pnl.toFixed(2)}`;
-                if (brokerage_applied > 0) {
-                    desc += ` (deducted ${user_brokerage_rate}% brokerage: ₹${brokerage_applied.toFixed(2)})`;
-                }
+                let desc = `Trade Closed (${trade.symbol}) | Exit Price: ₹${sell_price.toFixed(2)} | Exit Value: ₹${alloc.exit_value.toFixed(2)} | P&L: ₹${raw_client_pnl.toFixed(2)} | Sell Brokerage: ${user_brokerage_rate}% (₹${sell_brokerage.toFixed(2)}) | Net Credit: ₹${return_amount.toFixed(2)}`;
 
                 await LedgerEntry.create({
                     mob_num: user.mob_num,
@@ -172,6 +171,7 @@ const closeTrade = async (req, res) => {
                     amt_cr: return_amount,
                     amt_dr: 0,
                     cls_balance,
+                    trade_id: trade._id,
                     description: desc
                 });
 
@@ -186,6 +186,7 @@ const closeTrade = async (req, res) => {
             amt_cr: trade.total_exit_value,
             amt_dr: 0,
             cls_balance: 0,
+            trade_id: trade._id,
             description: `Master Trade Closed: ${trade.symbol}. Gross P&L: ₹${trade.master_pnl.toFixed(2)}`
         });
 
@@ -225,13 +226,14 @@ const triggerFlag = async (req, res) => {
             if (user) {
                 const actionName = flagType === 'TEM_OPEN' ? 'Temporary Open' : 'Temporary Close';
                 const desc = `Trade Alert: ${actionName} for ${trade.symbol} at ₹${activePrice} (Day ${day})`;
-                
+
                 await LedgerEntry.create({
                     mob_num: user.mob_num,
                     act_type: 'TRADE',
                     amt_cr: 0,
                     amt_dr: 0,
                     cls_balance: user.current_balance,
+                    trade_id: trade._id,
                     description: desc
                 });
             }

@@ -10,6 +10,7 @@ const ledgerEntrySchema = new mongoose.Schema({
     amt_cr: { type: Number, default: 0 },
     amt_dr: { type: Number, default: 0 },
     cls_balance: { type: Number, default: 0 },
+    // trade_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Trade' },
     description: { type: String }
 }, { timestamps: true });
 
