@@ -9,6 +9,7 @@ import PnL from './pages/PnL';
 import Ledger from './pages/Ledger';
 import Trades from './pages/Trade';
 import Settings from './pages/Settings';
+import Rules from './pages/Rules';
 
 function App() {
   return (
@@ -22,6 +23,7 @@ function App() {
         <Route path="/ledger" element={<Ledger />} />
         <Route path="/trades" element={<Trades />} />
         <Route path="/settings" element={<Settings />} />
+        <Route path="/rules" element={<Rules />} />
       </Routes>
     </Router>
   );

@@ -45,6 +45,9 @@ const Sidebar = () => {
                 <Link to="/settings" className={`nav-item ${isActive('/settings')}`}>
                     <i className="fas fa-cog"></i> Settings
                 </Link>
+                <Link to="/rules" className={`nav-item ${isActive('/rules')}`}>
+                    <i className="fas fa-gavel"></i> Rules
+                </Link>
 
                 {/* Fixed Logout Button */}
                 <div className="nav-item" onClick={handleLogout} style={{ marginTop: 'auto', color: 'var(--danger)', cursor: 'pointer' }}>

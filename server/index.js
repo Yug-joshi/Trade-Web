@@ -8,6 +8,7 @@ const tradeRoutes = require('./routes/tradeRoutes');
 const ledgerRoutes = require('./routes/ledgerRoutes');
 const userRoutes = require("./routes/userRoutes");
 const excelRoutes = require('./routes/excelRoutes');
+const ruleRoutes = require("./routes/ruleRoutes");
 const { authMiddleware } = require("./middleware/authMiddleware");
 
 // Load env vars
@@ -29,10 +30,13 @@ app.use(express.json()); // Allows us to accept JSON data in the body
 
 // Request Logger Middleware
 app.use((req, res, next) => {
-  console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+  console.log(`[DEBUG LOG] ${new Date().toISOString()} - ${req.method} ${req.url}`);
   next();
 });
 
+console.log("[DEBUG] Registering /api/rules");
+app.use("/api/rules", ruleRoutes);
+console.log("[DEBUG] Registered /api/rules");
 app.use('/api/trades', tradeRoutes);
 app.use('/api/ledger', ledgerRoutes);
 app.use("/api/users", userRoutes);

@@ -46,12 +46,6 @@ const Login = () => {
         }}>
             <div className="card" style={{ width: '100%', maxWidth: '400px', padding: '2.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
 
-                <div style={{
-                    textAlign: 'center', color: '#fbbf24', fontSize: '0.85rem', fontWeight: 'bold',
-                    padding: '10px', backgroundColor: 'rgba(251, 191, 36, 0.1)', borderRadius: '6px'
-                }}>
-                    ⚠️ DISCLAIMER: No real money involved. This is a simulation.
-                </div>
 
                 <div style={{ textAlign: 'center' }}>
                     <div style={{

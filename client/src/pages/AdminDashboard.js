@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { Doughnut, Pie } from 'react-chartjs-2';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
+import Rules from './Rules';
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
@@ -972,6 +973,8 @@ const AdminDashboard = () => {
                         </div>
                     </div>
                 );
+            case 'rules':
+                return <Rules standalone={true} />;
             default:
                 const stats = {
                     totalUsers: users.filter(u => u.role !== 'admin').length,
@@ -1480,6 +1483,9 @@ const AdminDashboard = () => {
                     </div>
                     <div className={`nav-item ${activeTab === 'gl_ledger' ? 'active' : ''}`} onClick={() => setActiveTab('gl_ledger')} style={{ cursor: 'pointer' }}>
                         <i className="fas fa-book"></i> GL LEDGER
+                    </div>
+                    <div className={`nav-item ${activeTab === 'rules' ? 'active' : ''}`} onClick={() => setActiveTab('rules')} style={{ cursor: 'pointer' }}>
+                        <i className="fas fa-gavel"></i> RULES
                     </div>
                     <div className="nav-item" onClick={handleLogout} style={{ marginTop: 'auto', color: 'var(--danger)', cursor: 'pointer' }}>
                         <i className="fas fa-sign-out-alt"></i> Logout

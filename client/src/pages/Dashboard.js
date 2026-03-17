@@ -112,11 +112,6 @@ const Dashboard = () => {
                     <div style={{ fontSize: '0.85rem', marginTop: '8px', color: 'var(--text-muted)' }}>Invested: ₹ {metrics.invested.toLocaleString()}</div>
                 </div>
 
-                <div className="card" style={{ borderLeft: '4px solid var(--danger)' }}>
-                    <div className="metric-label" style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '8px' }}>Win Rate</div>
-                    <div style={{ fontSize: '1.8rem', fontWeight: '700' }}>{metrics.winRate}%</div>
-                    <div style={{ fontSize: '0.85rem', marginTop: '8px', color: 'var(--text-muted)' }}>{metrics.completedTrades} Trades Completed</div>
-                </div>
             </div>
 
             {/* Charts Section */}
