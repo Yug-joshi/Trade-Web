@@ -90,10 +90,12 @@ const Trades = () => {
                             <tr style={{ textAlign: 'left', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase' }}>
                                 <th style={{ padding: '12px', borderBottom: '2px solid var(--border)' }}>Date</th>
                                 <th style={{ padding: '12px', borderBottom: '2px solid var(--border)' }}>Script</th>
-                                <th style={{ padding: '12px', borderBottom: '2px solid var(--border)' }}>Type</th>
                                 <th style={{ padding: '12px', borderBottom: '2px solid var(--border)' }}>Qty</th>
-                                <th style={{ padding: '12px', borderBottom: '2px solid var(--border)' }}>Price</th>
-                                <th style={{ padding: '12px', borderBottom: '2px solid var(--border)' }}>Total</th>
+                                <th style={{ padding: '12px', borderBottom: '2px solid var(--border)' }}>Buy Price (Incl. Brok)</th>
+                                <th style={{ padding: '12px', borderBottom: '2px solid var(--border)' }}>Exit Price</th>
+                                <th style={{ padding: '12px', borderBottom: '2px solid var(--border)' }}>Sell Brok</th>
+                                <th style={{ padding: '12px', borderBottom: '2px solid var(--border)' }}>Net P/L</th>
+                                <th style={{ padding: '12px', borderBottom: '2px solid var(--border)' }}>Total Cost</th>
                                 <th style={{ padding: '12px', borderBottom: '2px solid var(--border)' }}>Status</th>
                             </tr>
                         </thead>
@@ -102,21 +104,35 @@ const Trades = () => {
                                 <tr key={t._id}>
                                     <td style={{ padding: '14px 12px', borderBottom: '1px solid var(--border)' }}>{new Date(t.buy_timestamp).toLocaleDateString()}</td>
                                     <td style={{ padding: '14px 12px', borderBottom: '1px solid var(--border)', fontWeight: '600' }}>{t.master_trade_id?.symbol}</td>
-                                    <td style={{ padding: '14px 12px', borderBottom: '1px solid var(--border)' }}>
-                                        <span style={{
+                                    <td style={{ padding: '14px 12px', borderBottom: '1px solid var(--border)' }}>{t.allocation_qty}</td>
+                                    <td style={{ padding: '14px 12px', borderBottom: '1px solid var(--border)', fontFamily: 'monospace' }}>
+                                        ₹ {((t.total_value + (t.buy_brokerage || 0)) / t.allocation_qty).toFixed(2)}
+                                    </td>
+                                    <td style={{ padding: '14px 12px', borderBottom: '1px solid var(--border)', fontFamily: 'monospace' }}>
+                                        {t.exit_price ? `₹ ${t.exit_price.toFixed(2)}` : '-'}
+                                    </td>
+                                    <td style={{ padding: '14px 12px', borderBottom: '1px solid var(--border)', fontFamily: 'monospace' }}>
+                                        {t.sell_brokerage ? `₹ ${t.sell_brokerage.toFixed(2)}` : '-'}
+                                    </td>
+                                    <td style={{ 
+                                        padding: '14px 12px', borderBottom: '1px solid var(--border)', 
+                                        fontFamily: 'monospace', fontWeight: '700',
+                                        color: (t.client_pnl || 0) >= 0 ? 'var(--success)' : 'var(--danger)'
+                                    }}>
+                                        {(t.client_pnl || 0) >= 0 ? '+' : ''}₹ {(t.client_pnl || 0).toLocaleString()}
+                                    </td>
+                                    <td style={{ padding: '14px 12px', borderBottom: '1px solid var(--border)', fontFamily: 'monospace', fontWeight: '600' }}>
+                                        ₹ {(t.total_value + (t.buy_brokerage || 0)).toLocaleString()}
+                                    </td>
+                                    <td style={{ padding: '14px 12px', borderBottom: '1px solid var(--border)', fontSize: '0.85rem' }}>
+                                        <span style={{ 
                                             padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: '600',
-                                            background: 'rgba(16, 185, 129, 0.1)',
-                                            color: 'var(--success)'
+                                            background: t.status === 'CLOSED' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+                                            color: t.status === 'CLOSED' ? 'var(--danger)' : 'var(--success)'
                                         }}>
-                                            BUY
+                                            {t.status}
                                         </span>
                                     </td>
-                                    <td style={{ padding: '14px 12px', borderBottom: '1px solid var(--border)' }}>{t.allocation_qty}</td>
-                                    <td style={{ padding: '14px 12px', borderBottom: '1px solid var(--border)' }}>{t.allocation_price}</td>
-                                    <td style={{ padding: '14px 12px', borderBottom: '1px solid var(--border)', fontFamily: 'monospace', fontWeight: '600' }}>
-                                        ₹ {(t.total_value || 0).toLocaleString()}
-                                    </td>
-                                    <td style={{ padding: '14px 12px', borderBottom: '1px solid var(--border)', fontSize: '0.85rem' }}>{t.status}</td>
                                 </tr>
                             ))}
                         </tbody>

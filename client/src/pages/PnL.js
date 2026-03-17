@@ -7,7 +7,7 @@ const PnL = () => {
     const [trades, setTrades] = useState([]);
     const [stats, setStats] = useState({
         totalRealized: 0,
-        winRate: 0,
+        totalUnrealized: 0,
         avgProfit: 0,
         totalTrades: 0
     });
@@ -28,12 +28,18 @@ const PnL = () => {
     }, []);
 
     const processPnL = (data, ledgerData) => {
-        // Filter only Completed trades
+        // Filter only Completed trades for Realized
         const completed = data.filter(t => t.status === 'CLOSED');
+        // Filter Open trades for Unrealized
+        const openTrades = data.filter(t => t.status === 'OPEN');
 
-        // Extract "Funds Added" from ledger
-        const fundsAdded = ledgerData.filter(l => 
-            l.act_type === 'CREDIT' && 
+        // Extract "Funds Added" from ledger, filter out Trade Alerts (M to M)
+        const filteredLedger = ledgerData.filter(l =>
+            !l.description.includes('Trade Alert') && !l.description.includes('M to M')
+        );
+
+        const fundsAdded = filteredLedger.filter(l =>
+            l.act_type === 'CREDIT' &&
             (l.description.includes('Fund Added') || l.description.includes('Funds Added') || l.description.includes('Balance Added'))
         );
 
@@ -60,20 +66,23 @@ const PnL = () => {
             }))
         ].sort((a, b) => b.date - a.date);
 
-        let total = 0;
-        let wins = 0;
+        let totalRealized = 0;
+        let totalUnrealized = 0;
 
         completed.forEach(t => {
-            total += (t.client_pnl || 0);
-            if ((t.client_pnl || 0) > 0) wins++;
+            totalRealized += (t.client_pnl || 0);
+        });
+
+        openTrades.forEach(t => {
+            totalUnrealized += (t.client_pnl || 0);
         });
 
         setTrades(combinedTableData);
         setStats({
-            totalRealized: total,
+            totalRealized,
+            totalUnrealized,
             totalTrades: completed.length,
-            winRate: completed.length > 0 ? ((wins / completed.length) * 100).toFixed(0) : 0,
-            avgProfit: completed.length > 0 ? (total / completed.length).toFixed(0) : 0
+            avgProfit: completed.length > 0 ? (totalRealized / completed.length).toFixed(0) : 0
         });
     };
 
@@ -92,13 +101,10 @@ const PnL = () => {
                     </div>
                 </div>
                 <div className="card">
-                    <div className="metric-label">Win Rate</div>
-                    <div style={{ fontSize: '1.8rem', fontWeight: '700' }}>{stats.winRate}%</div>
-                    <div className="text-muted" style={{ fontSize: '0.85rem', marginTop: '8px' }}>{stats.totalTrades} Trades Completed</div>
-                </div>
-                <div className="card">
-                    <div className="metric-label">Avg Profit / Trade</div>
-                    <div style={{ fontSize: '1.8rem', fontWeight: '700' }}>₹ {stats.avgProfit}</div>
+                    <div className="metric-label">Total Unrealized P&L</div>
+                    <div className={stats.totalUnrealized >= 0 ? "text-up" : "text-down"} style={{ fontSize: '1.8rem', fontWeight: '700' }}>
+                        {stats.totalUnrealized >= 0 ? '+' : ''} ₹ {stats.totalUnrealized.toLocaleString()}
+                    </div>
                 </div>
             </div>
 

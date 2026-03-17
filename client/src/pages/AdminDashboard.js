@@ -342,7 +342,7 @@ const AdminDashboard = () => {
                 flagType,
                 activePrice: Number(flagInputs.activePrice)
             });
-            alert(`${flagType} executed successfully.`);
+            alert(`${flagType === 'M to M' ? 'M to M' : flagType} executed successfully.`);
             setShowFlagModal(false);
             fetchDashboardData();
         } catch (error) {
@@ -667,7 +667,7 @@ const AdminDashboard = () => {
                                                     {t.status === 'OPEN' && (
                                                         <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
                                                             <button className="btn" title="View Allocations" style={{ padding: '5px 10px', fontSize: '0.8rem', background: 'var(--primary)', color: '#fff', border: 'none' }} onClick={(e) => { e.stopPropagation(); openTradeDetails(t); }}><i className="fas fa-eye"></i></button>
-                                                            <button className="btn" style={{ padding: '5px 10px', fontSize: '0.8rem', background: '#ef4444', color: '#fff', border: 'none' }} onClick={(e) => { e.stopPropagation(); openFlagModal(t, 'TEM_CLOSE'); }}>M to M</button>
+                                                            <button className="btn" style={{ padding: '5px 10px', fontSize: '0.8rem', background: '#ef4444', color: '#fff', border: 'none' }} onClick={(e) => { e.stopPropagation(); openFlagModal(t, 'M to M'); }}>M to M</button>
                                                             {(t.allocated_qty || 0) < t.total_qty && (
                                                                 <button className="btn btn-primary" style={{ padding: '5px 10px', fontSize: '0.8rem' }} onClick={(e) => { e.stopPropagation(); openAllocateModal(t); }}>Allocate</button>
                                                             )}
