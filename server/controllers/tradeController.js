@@ -50,6 +50,7 @@ const allocateTrade = async (req, res) => {
         const trade = await Trade.findById(id);
         if (!trade) return res.status(404).json({ message: "Trade not found" });
         if (trade.status === 'CLOSED') return res.status(400).json({ message: "Cannot allocate a closed trade" });
+        if (trade.allocated_qty > 0) return res.status(400).json({ message: "Trade has already been allocated and cannot be modified." });
 
         const allocatedSoFar = trade.allocated_qty || 0;
         const totalAllocated = allocations.reduce((sum, alloc) => sum + Number(alloc.allocation_qty), 0);
@@ -81,6 +82,7 @@ const allocateTrade = async (req, res) => {
                 allocation_qty: alloc.allocation_qty,
                 allocation_price: trade.buy_price,
                 total_value,
+                user_brokerage_rate,
                 buy_brokerage,
                 status: "OPEN"
             });
@@ -144,8 +146,8 @@ const closeTrade = async (req, res) => {
             // Core P&L difference
             const raw_client_pnl = alloc.exit_value - alloc.total_value;
 
-            // Apply unique brokerage 
-            let user_brokerage_rate = user && user.brokerage !== undefined ? user.brokerage : 2; // Default 2%
+            // Apply unique brokerage (use stored rate or fallback to user rate)
+            let user_brokerage_rate = (alloc.user_brokerage_rate !== undefined) ? alloc.user_brokerage_rate : (user && user.brokerage !== undefined ? user.brokerage : 2);
             const sell_brokerage = alloc.exit_value * (user_brokerage_rate / 100);
 
             const total_brokerage = (alloc.buy_brokerage || 0) + sell_brokerage;

@@ -57,7 +57,7 @@ const AdminDashboard = () => {
     const [flagInputs, setFlagInputs] = useState({ day: 1, activePrice: '' });
 
     // Form States
-    const [newUser, setNewUser] = useState({ user_name: '', mob_num: '', password: '', brokerage: 2, current_balance: 100000 });
+    const [newUser, setNewUser] = useState({ user_name: '', mob_num: '', password: '', brokerage: 0, current_balance: 100000 });
     const [editingUser, setEditingUser] = useState(null);
     const [fundsUser, setFundsUser] = useState(null);
     const [fundsAmount, setFundsAmount] = useState('');
@@ -147,7 +147,7 @@ const AdminDashboard = () => {
             setShowUserModal(false);
             fetchDashboardData();
         } catch (error) {
-            alert(error.response?.data?.msg || "Error creating user");
+            alert(error.response?.data?.message || error.response?.data?.msg || "Error creating user");
         }
     };
 
@@ -228,7 +228,7 @@ const AdminDashboard = () => {
             setShowTradeModal(false);
             fetchDashboardData();
         } catch (error) {
-            alert("Error creating trade");
+            alert(error.response?.data?.message || error.response?.data?.msg || "Error creating trade");
         }
         setIsSubmitting(false);
     };
@@ -240,7 +240,7 @@ const AdminDashboard = () => {
             setTradeDetailsAllocations(res.data);
             setShowTradeDetailsModal(true);
         } catch (error) {
-            alert("Error fetching trade details.");
+            alert(error.response?.data?.message || "Error fetching trade details.");
         }
     };
 
@@ -299,7 +299,7 @@ const AdminDashboard = () => {
             setShowAllocateModal(false);
             fetchDashboardData();
         } catch (error) {
-            alert(error.response?.data?.message || "Error allocating");
+            alert(error.response?.data?.message || error.response?.data?.msg || "Error allocating");
         }
         setIsSubmitting(false);
     };
@@ -320,7 +320,7 @@ const AdminDashboard = () => {
             setShowCloseModal(false);
             fetchDashboardData();
         } catch (error) {
-            alert(error.response?.data?.message || "Error closing trade");
+            alert(error.response?.data?.message || error.response?.data?.msg || "Error closing trade");
         }
         setIsSubmitting(false);
     };
@@ -346,7 +346,7 @@ const AdminDashboard = () => {
             setShowFlagModal(false);
             fetchDashboardData();
         } catch (error) {
-            alert(error.response?.data?.message || "Error executing action.");
+            alert(error.response?.data?.message || error.response?.data?.msg || "Error executing action.");
         }
         setIsSubmitting(false);
     };
@@ -354,6 +354,22 @@ const AdminDashboard = () => {
     const handleLogout = () => {
         localStorage.removeItem('userInfo');
         navigate('/login');
+    };
+
+    const downloadAdminExcel = async () => {
+        try {
+            const response = await api.get('/reports/admin/trades', { responseType: 'blob' });
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Admin_Trade_Report_${Date.now()}.xlsx`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+        } catch (error) {
+            console.error("Admin Download error:", error);
+            alert("Failed to download Admin Excel report");
+        }
     };
 
     const doughnutData = useMemo(() => {
@@ -623,6 +639,9 @@ const AdminDashboard = () => {
                                     <option value="CLOSED">Closed</option>
                                     <option value="PERMANENT_CLOSE">Permanent Close</option>
                                 </select>
+                                <button className="btn" style={{ background: '#10b981', color: 'white', padding: '8px 12px' }} onClick={downloadAdminExcel}>
+                                    <i className="fas fa-file-excel"></i> Excel
+                                </button>
                                 <button className="btn btn-primary" onClick={() => setShowTradeModal(true)}>
                                     <i className="fas fa-plus"></i> Take Trade
                                 </button>
@@ -630,7 +649,7 @@ const AdminDashboard = () => {
                         </div>
 
                         <div className="box-table-container">
-                            <div className="box-table-header" style={{ gridTemplateColumns: 'minmax(140px, 1fr) 1fr 1fr 1fr 1fr 1fr 100px' }}>
+                            <div className="box-table-header" style={{ gridTemplateColumns: 'minmax(140px, 1fr) 1fr 1fr 1fr 1fr 1fr 240px' }}>
                                 <div onClick={() => requestSort('buy_timestamp')}>Date {sortConfig.key === 'buy_timestamp' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</div>
                                 <div onClick={() => requestSort('symbol')}>Symbol {sortConfig.key === 'symbol' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</div>
                                 <div onClick={() => requestSort('total_qty')}>Qty {sortConfig.key === 'total_qty' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</div>
@@ -644,7 +663,7 @@ const AdminDashboard = () => {
                                     <div className={`box-table-row ${expandedRows.has(t._id) ? 'expanded' : ''}`}
                                         onClick={() => toggleRow(t._id)}
                                         style={{
-                                            gridTemplateColumns: 'minmax(140px, 1fr) 1fr 1fr 1fr 1fr 1fr 100px',
+                                            gridTemplateColumns: 'minmax(140px, 1fr) 1fr 1fr 1fr 1fr 1fr 240px',
                                             borderLeft: `4px solid ${t.status === 'CLOSED' ? 'var(--danger)' : 'var(--success)'}`
                                         }}>
                                         <div className="box-table-cell">
@@ -677,28 +696,39 @@ const AdminDashboard = () => {
                                         <div className="box-table-cell" onClick={(e) => e.stopPropagation()}>
                                             {t.status === 'OPEN' && (
                                                 <div style={{ display: 'flex', gap: '5px' }}>
-                                                    <button className="btn" title="View Allocations" style={{ padding: '5px 8px', fontSize: '0.75rem', background: 'var(--primary)', color: '#fff', border: 'none' }} onClick={(e) => { e.stopPropagation(); openTradeDetails(t); }}><i className="fas fa-eye"></i></button>
-                                                    <button className="btn btn-primary" style={{ padding: '5px 8px', fontSize: '0.75rem' }} onClick={(e) => { e.stopPropagation(); openAllocateModal(t); }}>Allocate</button>
+                                                    {(t.allocated_qty || 0) === 0 && (
+                                                        <button className="btn btn-primary" style={{ padding: '5px 8px', fontSize: '0.75rem' }} onClick={(e) => { e.stopPropagation(); openAllocateModal(t); }}>Allocate</button>
+                                                    )}
+                                                    <button className="btn" style={{ padding: '5px 8px', fontSize: '0.75rem', background: 'var(--danger)', color: 'white', border: 'none' }} onClick={(e) => { e.stopPropagation(); openCloseModal(t); }}>Close Trade</button>
+                                                    <button className="btn" style={{ padding: '5px 8px', fontSize: '0.75rem', background: 'var(--warning)', color: 'white', border: 'none' }} onClick={(e) => { e.stopPropagation(); openFlagModal(t, 'TEM_CLOSE'); }}>M to M</button>
                                                 </div>
                                             )}
                                         </div>
                                     </div>
                                     {expandedRows.has(t._id) && (
-                                        <div style={{ padding: '1rem 2rem', background: 'var(--bg-body)', borderRadius: '0 0 12px 12px', marginTop: '-12px', marginBottom: '12px', border: '1px solid var(--border)', borderTop: 'none' }}>
-                                            {/* Expanded content remains similar but styled a bit cleaner */}
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
-                                                <span style={{ fontSize: '0.85rem', fontWeight: '600' }}>Allocation Details</span>
-                                                <div style={{ display: 'flex', gap: '10px' }}>
-                                                    {t.status === 'OPEN' && (
-                                                        <>
-                                                            <button className="btn" style={{ padding: '4px 10px', fontSize: '0.75rem', background: 'var(--danger)', color: 'white', border: 'none' }} onClick={(e) => { e.stopPropagation(); openCloseModal(t); }}>Close Trade</button>
-                                                            <button className="btn" style={{ padding: '4px 10px', fontSize: '0.75rem', background: 'var(--warning)', color: 'white', border: 'none' }} onClick={(e) => { e.stopPropagation(); openFlagModal(t, 'TEM_CLOSE'); }}>M to M</button>
-                                                        </>
-                                                    )}
-                                                </div>
+                                        <div style={{ padding: '1.5rem', background: 'var(--bg-body)', borderRadius: '0 0 12px 12px', marginTop: '-12px', marginBottom: '12px', border: '1px solid var(--border)', borderTop: 'none' }}>
+                                            <div style={{ marginBottom: '1rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem' }}>
+                                                <span style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--primary)', textTransform: 'uppercase' }}>Current Allocations</span>
                                             </div>
-                                            {/* ... Allocation Table inside expanded row ... */}
-                                            {/* Keeping it simple for now, can refine further if needed */}
+
+                                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '10px' }}>
+                                                {allocations.filter(a => a.master_trade_id?._id === t._id).length > 0 ? (
+                                                    allocations.filter(a => a.master_trade_id?._id === t._id).map(alloc => (
+                                                        <div key={alloc._id} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px', background: 'var(--bg-card)', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                                                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                                                <span style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>{alloc.user_name || alloc.mob_num}</span>
+                                                                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{alloc.mob_num}</span>
+                                                            </div>
+                                                            <div style={{ textAlign: 'right' }}>
+                                                                <div style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>{alloc.allocation_qty} Qty</div>
+                                                                <div style={{ fontSize: '0.7rem', color: alloc.status === 'CLOSED' ? 'var(--danger)' : 'var(--success)' }}>{alloc.status}</div>
+                                                            </div>
+                                                        </div>
+                                                    ))
+                                                ) : (
+                                                    <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>No users allocated yet.</div>
+                                                )}
+                                            </div>
                                         </div>
                                     )}
                                 </React.Fragment>
@@ -803,26 +833,46 @@ const AdminDashboard = () => {
                                     <option value="OPEN">Open</option>
                                     <option value="CLOSED">Closed</option>
                                 </select>
+                                <button className="btn" style={{ background: '#10b981', color: 'white', padding: '8px 12px' }} onClick={downloadAdminExcel}>
+                                    <i className="fas fa-file-excel"></i> Excel
+                                </button>
                             </div>
                         </div>
                         <div className="box-table-container">
-                            <div className="box-table-header" style={{ gridTemplateColumns: 'minmax(140px, 1fr) 1.2fr 1fr 0.8fr 1fr 1fr 1fr' }}>
+                            <div className="box-table-header" style={{ gridTemplateColumns: 'minmax(120px, 1.2fr) 1.2fr 1fr 0.7fr 1fr 0.8fr 1.2fr 1fr 0.8fr 1.2fr 0.8fr' }}>
                                 <div onClick={() => requestSort('buy_timestamp')}>Date {sortConfig.key === 'buy_timestamp' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</div>
                                 <div onClick={() => requestSort('user_name')}>User {sortConfig.key === 'user_name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</div>
                                 <div onClick={() => requestSort('master_trade_id.symbol')}>Symbol {sortConfig.key === 'master_trade_id.symbol' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</div>
                                 <div onClick={() => requestSort('allocation_qty')}>Qty {sortConfig.key === 'allocation_qty' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</div>
-                                <div>Buy Value</div>
-                                <div>Exit Value</div>
+                                <div>Buy Price</div>
+                                <div>Buy Brok</div>
+                                <div>Total Buy</div>
+                                <div>Sell Price</div>
+                                <div>Sell Brok</div>
+                                <div>Total Sell</div>
                                 <div onClick={() => requestSort('client_pnl')}>P&L {sortConfig.key === 'client_pnl' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</div>
                             </div>
                             {sortedAllocations.map(a => {
                                 const qty = a.allocation_qty || 0;
                                 const isClosed = a.status === 'CLOSED';
-                                const totalBuyPrice = (a.allocation_price * qty) + ((a.allocation_price * qty) * ((a.user_brokerage || 2) / 100));
-                                const totalSellPrice = isClosed ? ((a.exit_price * qty) + ((a.exit_price * qty) * ((a.user_brokerage || 2) / 100))) : 0;
+
+                                // Find user to get their current brokerage % if not locked in the record
+                                const userObj = users.find(u => String(u.mob_num).replace(/^0+/, '') === String(a.mob_num).replace(/^0+/, ''));
+                                const brokRate = a.user_brokerage_rate !== undefined ? a.user_brokerage_rate : (userObj ? userObj.brokerage : 2);
+
+                                // Formulas: (Price * Rate%) * Qty
+                                const rawBuyVal = a.total_value || (a.allocation_price * qty);
+
+                                // If DB has 0 for brokerage (old records), calculate it on the fly for display
+                                const buyBrokAmount = (a.buy_brokerage !== undefined && a.buy_brokerage !== 0) ? a.buy_brokerage : (rawBuyVal * (brokRate / 100));
+                                const totalBuy = rawBuyVal + buyBrokAmount;
+
+                                const rawSellPriceTotal = a.exit_value || 0;
+                                const sellBrokAmount = (a.sell_brokerage !== undefined && a.sell_brokerage !== 0) ? a.sell_brokerage : (isClosed ? (rawSellPriceTotal * (brokRate / 100)) : 0);
+                                const totalSell = isClosed ? (rawSellPriceTotal - sellBrokAmount) : 0;
 
                                 return (
-                                    <div className="box-table-row" key={a._id} style={{ gridTemplateColumns: 'minmax(140px, 1fr) 1.2fr 1fr 0.8fr 1fr 1fr 1fr', borderLeft: `4px solid ${isClosed ? (a.client_pnl >= 0 ? 'var(--success)' : 'var(--danger)') : 'var(--warning)'}` }}>
+                                    <div className="box-table-row" key={a._id} style={{ gridTemplateColumns: 'minmax(120px, 1.2fr) 1.2fr 1fr 0.7fr 1fr 0.8fr 1.2fr 1fr 0.8fr 1.2fr 0.8fr', borderLeft: `4px solid ${isClosed ? (a.client_pnl >= 0 ? 'var(--success)' : 'var(--danger)') : 'var(--warning)'}` }}>
                                         <div className="box-table-cell">
                                             <span className="cell-label">Date</span>
                                             {new Date(a.buy_timestamp).toLocaleDateString()}
@@ -840,12 +890,28 @@ const AdminDashboard = () => {
                                             {qty}
                                         </div>
                                         <div className="box-table-cell font-mono">
-                                            <span className="cell-label">Buy Val</span>
-                                            ₹{totalBuyPrice.toFixed(0)}
+                                            <span className="cell-label">Buy Price</span>
+                                            ₹{rawBuyVal.toFixed(0)}
+                                        </div>
+                                        <div className="box-table-cell font-mono" style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                            <span className="cell-label">Buy Brok</span>
+                                            ₹{buyBrokAmount.toFixed(0)} <span style={{ fontSize: '0.65rem' }}>({brokRate}%)</span>
+                                        </div>
+                                        <div className="box-table-cell font-mono" style={{ fontWeight: '600' }}>
+                                            <span className="cell-label">Total Buy</span>
+                                            ₹{totalBuy.toFixed(0)}
                                         </div>
                                         <div className="box-table-cell font-mono">
-                                            <span className="cell-label">Exit Val</span>
-                                            {isClosed ? `₹${totalSellPrice.toFixed(0)}` : '-'}
+                                            <span className="cell-label">Sell Price</span>
+                                            {isClosed ? `₹${rawSellPriceTotal.toFixed(0)}` : '-'}
+                                        </div>
+                                        <div className="box-table-cell font-mono" style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                            <span className="cell-label">Sell Brok</span>
+                                            {isClosed ? <>₹{sellBrokAmount.toFixed(0)} <span style={{ fontSize: '0.65rem' }}>({brokRate}%)</span></> : '-'}
+                                        </div>
+                                        <div className="box-table-cell font-mono" style={{ fontWeight: '600' }}>
+                                            <span className="cell-label">Total Sell</span>
+                                            {isClosed ? `₹${totalSell.toFixed(0)}` : '-'}
                                         </div>
                                         <div className="box-table-cell font-mono" style={{ fontWeight: 'bold', color: isClosed ? (a.client_pnl >= 0 ? 'var(--success)' : 'var(--danger)') : 'inherit' }}>
                                             <span className="cell-label">P&L</span>
@@ -860,7 +926,12 @@ const AdminDashboard = () => {
             case 'gl_ledger':
                 return (
                     <div className="card">
-                        <h2 style={{ fontSize: '1.2rem', marginBottom: '1.5rem' }}>Global Ledger</h2>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                            <h2 style={{ fontSize: '1.2rem' }}>Global Ledger</h2>
+                            <button className="btn" style={{ background: '#10b981', color: 'white', padding: '8px 12px' }} onClick={downloadAdminExcel}>
+                                <i className="fas fa-file-excel"></i> Excel
+                            </button>
+                        </div>
                         <div className="box-table-container">
                             <div className="box-table-header" style={{ gridTemplateColumns: '1.2fr 1.2fr 1.5fr 1fr 1fr 1.2fr' }}>
                                 <div onClick={() => requestSort('entry_date')}>Timestamp {sortConfig.key === 'entry_date' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</div>

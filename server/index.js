@@ -7,6 +7,7 @@ const connectDB = require('./config/db');
 const tradeRoutes = require('./routes/tradeRoutes');
 const ledgerRoutes = require('./routes/ledgerRoutes');
 const userRoutes = require("./routes/userRoutes");
+const excelRoutes = require('./routes/excelRoutes');
 const { authMiddleware } = require("./middleware/authMiddleware");
 
 // Load env vars
@@ -35,6 +36,7 @@ app.use((req, res, next) => {
 app.use('/api/trades', tradeRoutes);
 app.use('/api/ledger', ledgerRoutes);
 app.use("/api/users", userRoutes);
+app.use('/api/reports', excelRoutes);
 
 // Basic Route for testing
 app.get('/', (req, res) => {
