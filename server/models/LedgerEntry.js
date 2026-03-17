@@ -17,4 +17,4 @@ const ledgerEntrySchema = new mongoose.Schema({
 
 ledgerEntrySchema.index({ mob_num: 1 });
 
-module.exports = mongoose.model('LedgerEntry.', ledgerEntrySchema);
+module.exports = mongoose.model('LedgerEntry', ledgerEntrySchema);

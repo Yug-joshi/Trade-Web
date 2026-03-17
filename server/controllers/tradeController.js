@@ -362,7 +362,7 @@ const triggerFlag = async (req, res) => {
             }
         }
 
-        res.status(201).json({ message: "Flag triggered successfully.", flag });
+        res.status(201).json({ message: "Flag triggered successfully", flag });
     } catch (error) {
         console.error("Trigger Flag Error:", error);
         res.status(500).json({ message: error.message });

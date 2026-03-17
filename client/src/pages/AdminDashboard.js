@@ -616,7 +616,7 @@ const AdminDashboard = () => {
                                 <div style={{ display: 'flex' }}>
                                     <input
                                         type="text"
-                                        placeholder="Search Symbol or ID...."
+                                        placeholder="Search Symbol or ID..."
                                         value={masterSearchInput}
                                         onChange={(e) => setMasterSearchInput(e.target.value)}
                                         onKeyDown={(e) => e.key === 'Enter' && setMasterSearch(masterSearchInput)}
