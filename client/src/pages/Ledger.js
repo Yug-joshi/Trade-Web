@@ -23,7 +23,7 @@ const Ledger = () => {
         const fetchLedger = async () => {
             try {
                 const { data } = await api.get('/ledger');
-
+                console.log("RAW LEDGER DATA:", data);
                 // Calculate Running Balance on the Frontend for display accuracy
                 // Backend sends data sorted { entry_date: -1 } (newest first).
                 let currentBal = 0;
