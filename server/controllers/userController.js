@@ -90,7 +90,7 @@ const loginUser = async (req, res) => {
         user_name: user.user_name,
         mob_num: user.mob_num,
         role,
-        ...(role === 'user' && { client_id: user.client_id, status: user.status })
+        ...((role === 'user' || role === 'client') && { client_id: user.client_id, status: user.status })
       }
     });
   } catch (err) {
@@ -140,10 +140,10 @@ const updateUser = async (req, res) => {
     }
 
     const oldMobNum = user.mob_num;
-    const isMobNumChanging = sanitizedMobNum && sanitizedMobNum !== oldMobNum;
+    const isMobNumChanging = mob_num && mob_num !== oldMobNum;
 
     user.user_name = user_name || user.user_name;
-    user.mob_num = sanitizedMobNum;
+    user.mob_num = mob_num || user.mob_num;
     user.brokerage = brokerage !== undefined ? brokerage : user.brokerage;
     user.status = status || user.status;
 
@@ -226,4 +226,79 @@ const withdrawFunds = async (req, res) => {
   }
 };
 
-module.exports = { registerUser, loginUser, getUsers, updateUser, addFunds, withdrawFunds };
+// @desc    Get current user profile
+// @route   GET /api/users/profile
+const getProfile = async (req, res) => {
+  try {
+    let user;
+    if (req.user.role === 'admin') {
+      user = await Admin.findById(req.user.id).select("-password").lean();
+    } else {
+      user = await User.findById(req.user.id).select("-password").lean();
+    }
+    
+    // Fallback search if role mismatch occurs
+    if (!user) {
+        user = await Admin.findById(req.user.id).select("-password").lean() || 
+               await User.findById(req.user.id).select("-password").lean();
+    }
+
+    if (!user) return res.status(404).json({ msg: "Profile not found" });
+    res.json(user);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// @desc    Update current user profile (self)
+// @route   PUT /api/users/profile
+const updateProfile = async (req, res) => {
+  try {
+    const { user_name } = req.body;
+    let user;
+    
+    if (req.user.role === 'admin') {
+      user = await Admin.findById(req.user.id);
+    } else {
+      user = await User.findById(req.user.id);
+    }
+
+    if (!user) return res.status(404).json({ msg: "User not found" });
+
+    if (user_name) user.user_name = user_name;
+    
+    await user.save();
+    res.json({ msg: "Profile updated successfully", user: { user_name: user.user_name } });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// @desc    Change current user password
+// @route   POST /api/users/change-password
+const changePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    let user;
+    
+    if (req.user.role === 'admin') {
+      user = await Admin.findById(req.user.id);
+    } else {
+      user = await User.findById(req.user.id);
+    }
+
+    if (!user) return res.status(404).json({ msg: "User not found" });
+
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) return res.status(400).json({ msg: "Incorrect current password" });
+
+    user.password = await bcrypt.hash(newPassword, 10);
+    await user.save();
+
+    res.json({ msg: "Password updated successfully" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+module.exports = { registerUser, loginUser, getUsers, updateUser, addFunds, withdrawFunds, getProfile, updateProfile, changePassword };

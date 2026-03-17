@@ -49,26 +49,36 @@ const Trades = () => {
                     <input type="text" placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} style={{ padding: '8px' }} />
                     <button className="btn btn-primary" onClick={handleFilter}>Filter</button>
                 </div>
-                <table style={{ width: '100%' }}>
-                    <thead>
-                        <tr>
-                            <th>Date</th>
-                            <th>Script</th>
-                            <th>Type</th>
-                            <th>Total</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {filteredTrades.map(t => (
-                            <tr key={t._id}>
-                                <td>{new Date(t.buy_timestamp).toLocaleDateString()}</td>
-                                <td>{t.master_trade_id?.symbol}</td>
-                                <td>BUY</td>
-                                <td>{t.total_value}</td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
+                <div className="box-table-container">
+                    <div className="box-table-header" style={{ gridTemplateColumns: 'minmax(120px, 1fr) 1.5fr 1fr 1fr' }}>
+                        <div>Date</div>
+                        <div>Script</div>
+                        <div>Type</div>
+                        <div>Total</div>
+                    </div>
+                    {filteredTrades.map(t => (
+                        <div className="box-table-row" key={t._id} style={{ gridTemplateColumns: 'minmax(120px, 1fr) 1.5fr 1fr 1fr' }}>
+                            <div className="box-table-cell">
+                                <span className="cell-label">Date</span>
+                                {new Date(t.buy_timestamp).toLocaleDateString()}
+                            </div>
+                            <div className="box-table-cell" style={{ fontWeight: '700' }}>
+                                <span className="cell-label">Script</span>
+                                {t.master_trade_id?.symbol}
+                            </div>
+                            <div className="box-table-cell">
+                                <span className="cell-label">Type</span>
+                                <span style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: '700', background: 'rgba(59, 130, 246, 0.1)', color: 'var(--primary)', textTransform: 'uppercase' }}>
+                                    BUY
+                                </span>
+                            </div>
+                            <div className="box-table-cell font-mono" style={{ fontWeight: '700' }}>
+                                <span className="cell-label">Total</span>
+                                ₹ {(t.total_value || 0).toLocaleString()}
+                            </div>
+                        </div>
+                    ))}
+                </div>
             </div>
         </Layout>
     );

@@ -137,83 +137,78 @@ const Dashboard = () => {
 
             {/* Recent Activity Table */}
             <div className="card">
-                <h3 style={{ fontSize: '1rem', marginBottom: '1rem' }}>Recent Activity</h3>
-                <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0' }}>
-                        <thead>
-                            <tr style={{ textAlign: 'left', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase' }}>
-                                <th style={{ padding: '12px', borderBottom: '2px solid var(--border)' }}>Date</th>
-                                <th style={{ padding: '12px', borderBottom: '2px solid var(--border)' }}>Script</th>
-                                <th style={{ padding: '12px', borderBottom: '2px solid var(--border)' }}>Type</th>
-                                <th style={{ padding: '12px', borderBottom: '2px solid var(--border)' }}>Amount</th>
-                                <th style={{ padding: '12px', borderBottom: '2px solid var(--border)' }}>Status</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {trades.slice(0, 5).map(trade => (
-                                <tr key={trade._id}>
-                                    <td style={{ padding: '14px 12px', borderBottom: '1px solid var(--border)', fontSize: '0.9rem' }}>
-                                        {new Date(trade.buy_timestamp).toLocaleDateString()}
-                                    </td>
-                                    <td style={{ padding: '14px 12px', borderBottom: '1px solid var(--border)', fontWeight: '600' }}>
-                                        {trade.master_trade_id?.symbol}
-                                    </td>
-                                    <td style={{ padding: '14px 12px', borderBottom: '1px solid var(--border)' }}>
-                                        <span style={{
-                                            padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: '600',
-                                            background: 'rgba(16, 185, 129, 0.1)',
-                                            color: 'var(--success)'
-                                        }}>
-                                            BUY
-                                        </span>
-                                    </td>
-                                    <td style={{ padding: '14px 12px', borderBottom: '1px solid var(--border)', fontFamily: 'monospace', fontWeight: '600' }}>
-                                        ₹ {(trade.total_value || 0).toLocaleString()}
-                                    </td>
-                                    <td style={{ padding: '14px 12px', borderBottom: '1px solid var(--border)', fontSize: '0.85rem' }}>
-                                        {trade.status}
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                <h3 style={{ fontSize: '1rem', marginBottom: '1.5rem' }}>Recent Activity</h3>
+                <div className="box-table-container">
+                    <div className="box-table-header" style={{ gridTemplateColumns: 'minmax(120px, 1fr) 1.5fr 1fr 1.2fr 1fr' }}>
+                        <div>Date</div>
+                        <div>Script</div>
+                        <div>Type</div>
+                        <div>Amount</div>
+                        <div>Status</div>
+                    </div>
+                    {trades.slice(0, 5).map(trade => (
+                        <div className="box-table-row" key={trade._id} style={{ gridTemplateColumns: 'minmax(120px, 1fr) 1.5fr 1fr 1.2fr 1fr' }}>
+                            <div className="box-table-cell">
+                                <span className="cell-label">Date</span>
+                                {new Date(trade.buy_timestamp).toLocaleDateString()}
+                            </div>
+                            <div className="box-table-cell" style={{ fontWeight: '700' }}>
+                                <span className="cell-label">Script</span>
+                                {trade.master_trade_id?.symbol}
+                            </div>
+                            <div className="box-table-cell">
+                                <span className="cell-label">Type</span>
+                                <span style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: '700', background: 'rgba(59, 130, 246, 0.1)', color: 'var(--primary)', textTransform: 'uppercase' }}>
+                                    BUY
+                                </span>
+                            </div>
+                            <div className="box-table-cell font-mono" style={{ fontWeight: '600' }}>
+                                <span className="cell-label">Amount</span>
+                                ₹ {(trade.total_value || 0).toLocaleString()}
+                            </div>
+                            <div className="box-table-cell">
+                                <span className="cell-label">Status</span>
+                                <span style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: '700', background: trade.status === 'CLOSED' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)', color: trade.status === 'CLOSED' ? 'var(--danger)' : 'var(--success)', textTransform: 'uppercase' }}>
+                                    {trade.status}
+                                </span>
+                            </div>
+                        </div>
+                    ))}
                 </div>
             </div>
 
             {/* Ledger Breakdown Table */}
             <div className="card" style={{ marginTop: '2rem' }}>
-                <h3 style={{ fontSize: '1rem', marginBottom: '1rem' }}>Ledger Breakdown</h3>
+                <h3 style={{ fontSize: '1rem', marginBottom: '1.5rem' }}>Ledger Summary</h3>
                 {ledgerSummary ? (
-                    <div style={{ overflowX: 'auto' }}>
-                        <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0' }}>
-                            <thead>
-                                <tr style={{ textAlign: 'left', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase' }}>
-                                    <th style={{ padding: '12px', borderBottom: '2px solid var(--border)' }}>Base Deposit</th>
-                                    <th style={{ padding: '12px', borderBottom: '2px solid var(--border)' }}>Previous Profit</th>
-                                    <th style={{ padding: '12px', borderBottom: '2px solid var(--border)' }}>Current P&L</th>
-                                    <th style={{ padding: '12px', borderBottom: '2px solid var(--border)' }}>Total Balance</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <td style={{ padding: '14px 12px', fontWeight: '600', fontFamily: 'monospace' }}>
-                                        ₹ {ledgerSummary.baseDeposit.toLocaleString()}
-                                    </td>
-                                    <td style={{ padding: '14px 12px', fontWeight: '600', fontFamily: 'monospace', color: ledgerSummary.previousProfit >= 0 ? 'var(--success)' : 'var(--danger)' }}>
-                                        {ledgerSummary.previousProfit >= 0 ? '+' : ''}₹ {ledgerSummary.previousProfit.toLocaleString()}
-                                    </td>
-                                    <td style={{ padding: '14px 12px', fontWeight: '600', fontFamily: 'monospace', color: ledgerSummary.currentPL >= 0 ? 'var(--success)' : 'var(--danger)' }}>
-                                        {ledgerSummary.currentPL >= 0 ? '+' : ''}₹ {ledgerSummary.currentPL.toLocaleString()}
-                                    </td>
-                                    <td style={{ padding: '14px 12px', fontWeight: '700', fontFamily: 'monospace', fontSize: '1.1rem' }}>
-                                        ₹ {ledgerSummary.totalBalance.toLocaleString()}
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
+                    <div className="box-table-container">
+                        <div className="box-table-header" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+                            <div>Base Deposit</div>
+                            <div>Previous Profit</div>
+                            <div>Current P&L</div>
+                            <div>Total Balance</div>
+                        </div>
+                        <div className="box-table-row" style={{ gridTemplateColumns: 'repeat(4, 1fr)', borderLeft: '4px solid var(--primary)' }}>
+                            <div className="box-table-cell font-mono" style={{ fontWeight: '700', fontSize: '1.1rem' }}>
+                                <span className="cell-label">Base Deposit</span>
+                                ₹ {ledgerSummary.baseDeposit.toLocaleString()}
+                            </div>
+                            <div className="box-table-cell font-mono" style={{ fontWeight: '700', fontSize: '1.1rem', color: ledgerSummary.previousProfit >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                                <span className="cell-label">Prev. Profit</span>
+                                {ledgerSummary.previousProfit >= 0 ? '+' : ''}₹ {ledgerSummary.previousProfit.toLocaleString()}
+                            </div>
+                            <div className="box-table-cell font-mono" style={{ fontWeight: '700', fontSize: '1.1rem', color: ledgerSummary.currentPL >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                                <span className="cell-label">Current P&L</span>
+                                {ledgerSummary.currentPL >= 0 ? '+' : ''}₹ {ledgerSummary.currentPL.toLocaleString()}
+                            </div>
+                            <div className="box-table-cell font-mono" style={{ fontWeight: '800', fontSize: '1.3rem', color: 'var(--primary)' }}>
+                                <span className="cell-label">Total Balance</span>
+                                ₹ {ledgerSummary.totalBalance.toLocaleString()}
+                            </div>
+                        </div>
                     </div>
                 ) : (
-                    <p className="text-muted">Loading ledger data...</p>
+                    <p className="text-muted" style={{ padding: '20px', textAlign: 'center' }}>Loading ledger data...</p>
                 )}
             </div>
         </Layout>

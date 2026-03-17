@@ -111,38 +111,46 @@ const PnL = () => {
                     </button>
                 </div>
 
-                <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0' }}>
-                        <thead>
-                            <tr style={{ textAlign: 'left', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase' }}>
-                                <th style={{ padding: '12px', borderBottom: '2px solid var(--border)' }}>Date</th>
-                                <th style={{ padding: '12px', borderBottom: '2px solid var(--border)' }}>Script</th>
-                                <th style={{ padding: '12px', borderBottom: '2px solid var(--border)' }}>Status</th>
-                                <th style={{ padding: '12px', borderBottom: '2px solid var(--border)', textAlign: 'right' }}>Qty</th>
-                                <th style={{ padding: '12px', borderBottom: '2px solid var(--border)', textAlign: 'right' }}>Price</th>
-                                <th style={{ padding: '12px', borderBottom: '2px solid var(--border)', textAlign: 'right' }}>Net P&L</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {trades.map(trade => (
-                                <tr key={trade.id}>
-                                    <td style={{ padding: '14px 12px', borderBottom: '1px solid var(--border)' }}>{trade.date.toLocaleDateString()}</td>
-                                    <td style={{ padding: '14px 12px', borderBottom: '1px solid var(--border)' }}>
-                                        <div style={{ fontWeight: '600' }}>{trade.script}</div>
-                                        {trade.type === 'TRADE' && <div style={{ fontSize: '0.75rem' }} className="text-muted">SELL</div>}
-                                    </td>
-                                    <td style={{ padding: '14px 12px', borderBottom: '1px solid var(--border)' }}>
-                                        <span style={{ background: 'var(--bg-body)', padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: '600' }}>{trade.status}</span>
-                                    </td>
-                                    <td style={{ padding: '14px 12px', borderBottom: '1px solid var(--border)', textAlign: 'right', fontFamily: 'monospace' }}>{trade.qty}</td>
-                                    <td style={{ padding: '14px 12px', borderBottom: '1px solid var(--border)', textAlign: 'right', fontFamily: 'monospace' }}>{trade.price}</td>
-                                    <td style={{ padding: '14px 12px', borderBottom: '1px solid var(--border)', textAlign: 'right', fontWeight: '700' }} className={trade.type === 'FUND' ? "text-up" : (trade.net_pnl >= 0 ? "text-up" : "text-down")}>
-                                        {trade.net_pnl > 0 ? '+' : ''}{trade.net_pnl.toLocaleString()}
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                <div className="box-table-container">
+                    <div className="box-table-header" style={{ gridTemplateColumns: 'minmax(120px, 1fr) 1.5fr 1fr 0.8fr 1fr 1fr' }}>
+                        <div>Date</div>
+                        <div>Script</div>
+                        <div>Status</div>
+                        <div style={{ textAlign: 'right' }}>Qty</div>
+                        <div style={{ textAlign: 'right' }}>Price</div>
+                        <div style={{ textAlign: 'right' }}>Net P&L</div>
+                    </div>
+                    {trades.map(trade => (
+                        <div className="box-table-row" key={trade.id} style={{ gridTemplateColumns: 'minmax(120px, 1fr) 1.5fr 1fr 0.8fr 1fr 1fr', borderLeft: `4px solid ${trade.type === 'FUND' ? 'var(--primary)' : (trade.net_pnl >= 0 ? 'var(--success)' : 'var(--danger)')}` }}>
+                            <div className="box-table-cell">
+                                <span className="cell-label">Date</span>
+                                {trade.date.toLocaleDateString()}
+                            </div>
+                            <div className="box-table-cell">
+                                <span className="cell-label">Script</span>
+                                <div style={{ fontWeight: '700' }}>{trade.script}</div>
+                                {trade.type === 'TRADE' && <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', color: 'var(--text-muted)' }}>SELL</div>}
+                            </div>
+                            <div className="box-table-cell">
+                                <span className="cell-label">Status</span>
+                                <span style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: '700', background: 'var(--bg-body)', textTransform: 'uppercase' }}>
+                                    {trade.status}
+                                </span>
+                            </div>
+                            <div className="box-table-cell font-mono" style={{ textAlign: 'right' }}>
+                                <span className="cell-label">Qty</span>
+                                {trade.qty}
+                            </div>
+                            <div className="box-table-cell font-mono" style={{ textAlign: 'right' }}>
+                                <span className="cell-label">Price</span>
+                                {trade.price}
+                            </div>
+                            <div className="box-table-cell font-mono" style={{ textAlign: 'right', fontWeight: '800', fontSize: '1.1rem', color: trade.type === 'FUND' ? 'var(--primary)' : (trade.net_pnl >= 0 ? 'var(--success)' : 'var(--danger)') }}>
+                                <span className="cell-label">Net P&L</span>
+                                {trade.net_pnl > 0 ? '+' : ''}{trade.net_pnl.toLocaleString()}
+                            </div>
+                        </div>
+                    ))}
                 </div>
             </div>
         </Layout>

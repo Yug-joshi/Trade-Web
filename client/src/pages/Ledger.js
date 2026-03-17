@@ -95,42 +95,48 @@ const Ledger = () => {
                     </div>
                 </div>
 
-                <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0' }}>
-                        <thead>
-                            <tr style={{ textAlign: 'left', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase' }}>
-                                <th style={{ padding: '12px', borderBottom: '2px solid var(--border)' }}>Date</th>
-                                <th style={{ padding: '12px', borderBottom: '2px solid var(--border)' }}>Particulars</th>
-                                <th style={{ padding: '12px', borderBottom: '2px solid var(--border)', textAlign: 'right' }}>Brokerage Fee</th>
-                                <th style={{ padding: '12px', borderBottom: '2px solid var(--border)', textAlign: 'right' }}>Debit</th>
-                                <th style={{ padding: '12px', borderBottom: '2px solid var(--border)', textAlign: 'right' }}>Credit</th>
-                                <th style={{ padding: '12px', borderBottom: '2px solid var(--border)', textAlign: 'right' }}>Running Bal</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {filteredLedger.map(row => {
-                                const brokerage = extractBrokerage(row.description);
-                                return (
-                                    <tr key={row._id}>
-                                        <td style={{ padding: '14px 12px', borderBottom: '1px solid var(--border)' }}>{new Date(row.entry_date).toLocaleDateString()}</td>
-                                        <td style={{ padding: '14px 12px', borderBottom: '1px solid var(--border)' }}>{row.description}</td>
-                                        <td style={{ padding: '14px 12px', borderBottom: '1px solid var(--border)', textAlign: 'right', fontFamily: 'monospace', color: 'var(--danger)' }}>
-                                            {brokerage > 0 ? `₹ ${brokerage.toFixed(2)}` : '-'}
-                                        </td>
-                                        <td style={{ padding: '14px 12px', borderBottom: '1px solid var(--border)', textAlign: 'right', fontFamily: 'monospace', color: 'var(--danger)' }}>
-                                            {row.amt_dr > 0 ? row.amt_dr.toLocaleString() : '-'}
-                                        </td>
-                                        <td style={{ padding: '14px 12px', borderBottom: '1px solid var(--border)', textAlign: 'right', fontFamily: 'monospace', color: 'var(--success)' }}>
-                                            {row.amt_cr > 0 ? row.amt_cr.toLocaleString() : '-'}
-                                        </td>
-                                        <td style={{ padding: '14px 12px', borderBottom: '1px solid var(--border)', textAlign: 'right', fontWeight: '700', fontFamily: 'monospace' }}>
-                                            ₹ {row.balance.toLocaleString()}
-                                        </td>
-                                    </tr>
-                                )
-                            })}
-                        </tbody>
-                    </table>
+                <div className="box-table-container">
+                    <div className="box-table-header" style={{ gridTemplateColumns: 'minmax(120px, 1fr) 2fr 0.8fr 1fr 1fr 1.2fr' }}>
+                        <div>Date</div>
+                        <div>Particulars</div>
+                        <div style={{ textAlign: 'right' }}>Brokerage</div>
+                        <div style={{ textAlign: 'right' }}>Debit</div>
+                        <div style={{ textAlign: 'right' }}>Credit</div>
+                        <div style={{ textAlign: 'right' }}>Running Bal</div>
+                    </div>
+                    {filteredLedger.map(row => {
+                        const brokerage = extractBrokerage(row.description);
+                        const isCredit = row.amt_cr > 0;
+                        const isDebit = row.amt_dr > 0;
+                        return (
+                            <div className="box-table-row" key={row._id} style={{ gridTemplateColumns: 'minmax(120px, 1fr) 2fr 0.8fr 1fr 1fr 1.2fr', borderLeft: `4px solid ${isCredit ? 'var(--success)' : (isDebit ? 'var(--danger)' : 'var(--border)')}` }}>
+                                <div className="box-table-cell">
+                                    <span className="cell-label">Date</span>
+                                    {new Date(row.entry_date).toLocaleDateString()}
+                                </div>
+                                <div className="box-table-cell">
+                                    <span className="cell-label">Particulars</span>
+                                    {row.description}
+                                </div>
+                                <div className="box-table-cell font-mono" style={{ textAlign: 'right', color: 'var(--danger)' }}>
+                                    <span className="cell-label">Brokerage</span>
+                                    {brokerage > 0 ? `₹${brokerage.toFixed(2)}` : '-'}
+                                </div>
+                                <div className="box-table-cell font-mono" style={{ textAlign: 'right', color: 'var(--danger)' }}>
+                                    <span className="cell-label">Debit</span>
+                                    {row.amt_dr > 0 ? `₹${row.amt_dr.toLocaleString()}` : '-'}
+                                </div>
+                                <div className="box-table-cell font-mono" style={{ textAlign: 'right', color: 'var(--success)' }}>
+                                    <span className="cell-label">Credit</span>
+                                    {row.amt_cr > 0 ? `₹${row.amt_cr.toLocaleString()}` : '-'}
+                                </div>
+                                <div className="box-table-cell font-mono" style={{ textAlign: 'right', fontWeight: '800', fontSize: '1.1rem' }}>
+                                    <span className="cell-label">Balance</span>
+                                    ₹ {row.balance.toLocaleString()}
+                                </div>
+                            </div>
+                        )
+                    })}
                 </div>
             </div>
         </Layout>

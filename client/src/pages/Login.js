@@ -68,10 +68,11 @@ const Login = () => {
                         type="button"
                         onClick={() => setIsAdminMode(false)}
                         style={{
-                            flex: 1, padding: '10px', background: 'none', border: 'none', cursor: 'pointer',
+                            flex: 1, padding: '12px', background: 'none', border: 'none', cursor: 'pointer',
                             color: !isAdminMode ? 'var(--primary)' : 'var(--text-muted)',
                             borderBottom: !isAdminMode ? '2px solid var(--primary)' : '2px solid transparent',
-                            fontWeight: '600', fontSize: '1rem', transition: 'all 0.3s'
+                            fontWeight: '600', fontSize: '1rem', transition: 'all 0.3s',
+                            display: 'flex', justifyContent: 'center', alignItems: 'center'
                         }}
                     >
                         User Login
@@ -80,10 +81,11 @@ const Login = () => {
                         type="button"
                         onClick={() => setIsAdminMode(true)}
                         style={{
-                            flex: 1, padding: '10px', background: 'none', border: 'none', cursor: 'pointer',
+                            flex: 1, padding: '12px', background: 'none', border: 'none', cursor: 'pointer',
                             color: isAdminMode ? 'var(--primary)' : 'var(--text-muted)',
                             borderBottom: isAdminMode ? '2px solid var(--primary)' : '2px solid transparent',
-                            fontWeight: '600', fontSize: '1rem', transition: 'all 0.3s'
+                            fontWeight: '600', fontSize: '1rem', transition: 'all 0.3s',
+                            display: 'flex', justifyContent: 'center', alignItems: 'center'
                         }}
                     >
                         Admin Login
@@ -120,7 +122,10 @@ const Login = () => {
                             required
                         />
                     </div>
-                    <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '12px', fontSize: '1rem', fontWeight: '600' }}>
+                    <button type="submit" className="btn btn-primary" style={{ 
+                        width: '100%', padding: '12px', fontSize: '1rem', fontWeight: '600',
+                        display: 'flex', justifyContent: 'center', alignItems: 'center'
+                    }}>
                         {isAdminMode ? 'Admin Login' : 'User Login'}
                     </button>
                 </form>

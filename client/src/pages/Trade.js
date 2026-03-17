@@ -84,43 +84,52 @@ const Trades = () => {
                 </div>
 
                 {/* Table */}
-                <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0' }}>
-                        <thead>
-                            <tr style={{ textAlign: 'left', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase' }}>
-                                <th style={{ padding: '12px', borderBottom: '2px solid var(--border)' }}>Date</th>
-                                <th style={{ padding: '12px', borderBottom: '2px solid var(--border)' }}>Script</th>
-                                <th style={{ padding: '12px', borderBottom: '2px solid var(--border)' }}>Type</th>
-                                <th style={{ padding: '12px', borderBottom: '2px solid var(--border)' }}>Qty</th>
-                                <th style={{ padding: '12px', borderBottom: '2px solid var(--border)' }}>Price</th>
-                                <th style={{ padding: '12px', borderBottom: '2px solid var(--border)' }}>Total</th>
-                                <th style={{ padding: '12px', borderBottom: '2px solid var(--border)' }}>Status</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {filteredTrades.map(t => (
-                                <tr key={t._id}>
-                                    <td style={{ padding: '14px 12px', borderBottom: '1px solid var(--border)' }}>{new Date(t.buy_timestamp).toLocaleDateString()}</td>
-                                    <td style={{ padding: '14px 12px', borderBottom: '1px solid var(--border)', fontWeight: '600' }}>{t.master_trade_id?.symbol}</td>
-                                    <td style={{ padding: '14px 12px', borderBottom: '1px solid var(--border)' }}>
-                                        <span style={{
-                                            padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: '600',
-                                            background: 'rgba(16, 185, 129, 0.1)',
-                                            color: 'var(--success)'
-                                        }}>
-                                            BUY
-                                        </span>
-                                    </td>
-                                    <td style={{ padding: '14px 12px', borderBottom: '1px solid var(--border)' }}>{t.allocation_qty}</td>
-                                    <td style={{ padding: '14px 12px', borderBottom: '1px solid var(--border)' }}>{t.allocation_price}</td>
-                                    <td style={{ padding: '14px 12px', borderBottom: '1px solid var(--border)', fontFamily: 'monospace', fontWeight: '600' }}>
-                                        ₹ {(t.total_value || 0).toLocaleString()}
-                                    </td>
-                                    <td style={{ padding: '14px 12px', borderBottom: '1px solid var(--border)', fontSize: '0.85rem' }}>{t.status}</td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                <div className="box-table-container">
+                    <div className="box-table-header" style={{ gridTemplateColumns: 'minmax(120px, 1fr) 1.5fr 1fr 0.8fr 1fr 1.2fr 1fr' }}>
+                        <div>Date</div>
+                        <div>Script</div>
+                        <div>Type</div>
+                        <div>Qty</div>
+                        <div>Price</div>
+                        <div>Total</div>
+                        <div>Status</div>
+                    </div>
+                    {filteredTrades.map(t => (
+                        <div className="box-table-row" key={t._id} style={{ gridTemplateColumns: 'minmax(120px, 1fr) 1.5fr 1fr 0.8fr 1fr 1.2fr 1fr' }}>
+                            <div className="box-table-cell">
+                                <span className="cell-label">Date</span>
+                                {new Date(t.buy_timestamp).toLocaleDateString()}
+                            </div>
+                            <div className="box-table-cell" style={{ fontWeight: '700' }}>
+                                <span className="cell-label">Script</span>
+                                {t.master_trade_id?.symbol}
+                            </div>
+                            <div className="box-table-cell">
+                                <span className="cell-label">Type</span>
+                                <span style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: '700', background: 'rgba(59, 130, 246, 0.1)', color: 'var(--primary)', textTransform: 'uppercase' }}>
+                                    BUY
+                                </span>
+                            </div>
+                            <div className="box-table-cell">
+                                <span className="cell-label">Qty</span>
+                                {t.allocation_qty}
+                            </div>
+                            <div className="box-table-cell font-mono">
+                                <span className="cell-label">Price</span>
+                                ₹{t.allocation_price}
+                            </div>
+                            <div className="box-table-cell font-mono" style={{ fontWeight: '700' }}>
+                                <span className="cell-label">Total</span>
+                                ₹{(t.total_value || 0).toLocaleString()}
+                            </div>
+                            <div className="box-table-cell">
+                                <span className="cell-label">Status</span>
+                                <span style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: '700', background: t.status === 'CLOSED' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)', color: t.status === 'CLOSED' ? 'var(--danger)' : 'var(--success)', textTransform: 'uppercase' }}>
+                                    {t.status}
+                                </span>
+                            </div>
+                        </div>
+                    ))}
                 </div>
             </div>
         </Layout>
