@@ -86,8 +86,20 @@ const PnL = () => {
         });
     };
 
-    const downloadReport = () => {
-        alert("Downloading PDF Report... (Feature coming soon)");
+    const downloadReport = async () => {
+        try {
+            const response = await api.get('/reports/pnl', { responseType: 'blob' });
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `PnL_Report_${Date.now()}.xlsx`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+        } catch (error) {
+            console.error("Download error:", error);
+            alert("Failed to download Excel report");
+        }
     };
 
     return (
@@ -113,7 +125,7 @@ const PnL = () => {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                     <h3 style={{ fontSize: '1rem' }}>Detailed Trade Book</h3>
                     <button className="btn btn-primary" onClick={downloadReport}>
-                        <i className="fas fa-file-pdf"></i> Download Report
+                        <i className="fas fa-file-excel"></i> Download Excel
                     </button>
                 </div>
 
