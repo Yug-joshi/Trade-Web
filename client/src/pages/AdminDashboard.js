@@ -342,7 +342,7 @@ const AdminDashboard = () => {
                 flagType,
                 activePrice: Number(flagInputs.activePrice)
             });
-            alert(`${flagType} executed successfully.`);
+            alert(`${flagType === 'M to M' ? 'M to M' : flagType} executed successfully.`);
             setShowFlagModal(false);
             fetchDashboardData();
         } catch (error) {

@@ -33,7 +33,7 @@ const registerUser = async (req, res) => {
       brokerage: brokerage !== undefined ? Number(brokerage) : 2,
       initial_balance: Number(req.body.current_balance) || 0,
       added_funds: 0,
-      current_balance: Number(balance),
+      current_balance: Number(req.body.current_balance) || 0,
       role: "user",
       status: "active"
     });
@@ -140,7 +140,8 @@ const updateUser = async (req, res) => {
     }
 
     const oldMobNum = user.mob_num;
-    const isMobNumChanging = mob_num && mob_num !== oldMobNum;
+    const sanitizedMobNum = mob_num ? mob_num.trim() : oldMobNum;
+    const isMobNumChanging = sanitizedMobNum !== oldMobNum;
 
     user.user_name = user_name || user.user_name;
     user.mob_num = mob_num || user.mob_num;

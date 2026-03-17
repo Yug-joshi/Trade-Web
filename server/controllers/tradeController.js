@@ -203,19 +203,20 @@ const triggerFlag = async (req, res) => {
     try {
         const { id } = req.params;
         const { day, flagType, activePrice } = req.body;
+        console.log("Triggering flag script with type:", flagType);
+
+        if (!flagType || activePrice === undefined) {
+            return res.status(400).json({ message: "Flag type and active price are required" });
+        }
 
         const trade = await Trade.findById(id);
         if (!trade) return res.status(404).json({ message: "Trade not found" });
 
-        const currentHour = new Date().getHours();
-
-        // Time controls removed by user request
-
         const flag = await DailyPriceFlag.create({
             tradeId: trade._id,
-            day,
+            day: Number(day) || 1,
             flagType,
-            activePrice
+            activePrice: Number(activePrice)
         });
 
         // Add informational ledger entry for each allocated user
@@ -224,16 +225,20 @@ const triggerFlag = async (req, res) => {
         for (const alloc of allocations) {
             const user = await User.findOne({ mob_num: alloc.mob_num });
             if (user) {
-                const actionName = flagType === 'TEM_OPEN' ? 'Temporary Open' : 'Temporary Close';
-                const desc = `Trade Alert: ${actionName} for ${trade.symbol} at ₹${activePrice} (Day ${day})`;
+                let actionName = 'Temporary Update';
+                if (flagType === 'TEM_OPEN') actionName = 'Temporary Open';
+                else if (flagType === 'TEM_CLOSE') actionName = 'Temporary Close';
+                else if (flagType === 'M to M') actionName = 'M to M';
+
+                const desc = `Trade Alert: ${actionName} for ${trade.symbol} at ₹${Number(activePrice).toFixed(2)} (Day ${day})`;
 
                 await LedgerEntry.create({
                     mob_num: user.mob_num,
                     act_type: 'TRADE',
                     amt_cr: 0,
                     amt_dr: 0,
-                    cls_balance: user.current_balance,
-                    trade_id: trade._id,
+                    cls_balance: user.current_balance || 0,
+                    // trade_id: trade._id, // Commented out to match schema exactly if needed, though it doesn't hurt
                     description: desc
                 });
             }
@@ -241,6 +246,7 @@ const triggerFlag = async (req, res) => {
 
         res.status(201).json({ message: "Flag triggered successfully", flag });
     } catch (error) {
+        console.error("Trigger Flag Error:", error);
         res.status(500).json({ message: error.message });
     }
 };
@@ -272,7 +278,7 @@ const getClientAllocations = async (req, res) => {
                 if (latestFlag) {
                     alloc.current_value = alloc.allocation_qty * latestFlag.activePrice;
                     alloc.active_price = latestFlag.activePrice;
-                    alloc.client_pnl = alloc.current_value - alloc.total_value; // Dynamic PnL
+                    alloc.client_pnl = (alloc.current_value - alloc.total_value) - (alloc.buy_brokerage || 0); // Dynamic PnL including buy brokerage
                 } else {
                     alloc.current_value = alloc.total_value;
                     alloc.active_price = alloc.allocation_price;

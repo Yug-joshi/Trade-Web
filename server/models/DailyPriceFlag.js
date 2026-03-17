@@ -12,7 +12,7 @@ const dailyPriceFlagSchema = new mongoose.Schema({
     },
     flagType: {
         type: String,
-        enum: ['TEM_OPEN', 'TEM_CLOSE'],
+        enum: ['TEM_OPEN', 'TEM_CLOSE', 'M to M'],
         required: true
     },
     activePrice: {
