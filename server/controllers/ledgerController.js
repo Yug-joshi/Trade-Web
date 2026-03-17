@@ -39,7 +39,12 @@ const getLedgerEntries = async (req, res) => {
                         $cond: {
                             if: { $gt: [{ $size: '$admin_info' }, 0] },
                             then: 'Admin',
-                            else: { $ifNull: [{ $arrayElemAt: ['$user_info.user_name', 0] }, '$mob_num'] }
+                            else: { 
+                                $let: {
+                                    vars: { u: { $arrayElemAt: ['$user_info', 0] } },
+                                    in: { $ifNull: ['$$u.user_name', '$mob_num'] }
+                                }
+                            }
                         }
                     },
                     act_type: 1,

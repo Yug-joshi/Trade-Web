@@ -330,7 +330,7 @@ const getTradeAllocations = async (req, res) => {
                     exit_value: 1,
                     client_pnl: 1,
                     status: 1,
-                    user_name: '$user_details.user_name'
+                    user_name: { $ifNull: ['$user_details.user_name', '$mob_num'] }
                 }
             }
         ]);
@@ -380,21 +380,25 @@ const getCurrentTable = async (req, res) => {
         const currentData = [];
 
         for (const alloc of openAllocations) {
+            // Use the master_trade from aggregation instead of the raw master_trade_id ObjectId
+            const masterTrade = alloc.master_trade || {};
+            
             // Find the latest active price flag for this master trade
-            const latestFlag = await DailyPriceFlag.findOne({ tradeId: alloc.master_trade_id._id }).sort({ timestamp: -1 });
+            const latestFlag = await DailyPriceFlag.findOne({ tradeId: alloc.master_trade_id }).sort({ timestamp: -1 });
 
             const current_price = latestFlag ? latestFlag.activePrice : alloc.allocation_price;
             const unrealized_pnl = (current_price - alloc.allocation_price) * alloc.allocation_qty;
 
             currentData.push({
-                master_trade_id: alloc.master_trade_id.master_trade_id, // For key bridging on frontend
+                master_trade_id: masterTrade.master_trade_id || 'N/A', // Custom MT ID
                 allocation_id: alloc.allocation_id,
-                symbol: alloc.master_trade_id.symbol,
+                symbol: masterTrade.symbol || 'N/A',
                 total_qty: alloc.allocation_qty,
                 buy_price: alloc.allocation_price,
                 current_price,
                 unrealized_pnl,
                 date: alloc.buy_timestamp,
+                mob_num: alloc.mob_num,
                 user_name: alloc.user_details?.user_name || alloc.mob_num
             });
         }
@@ -458,7 +462,7 @@ const getAllAllocations = async (req, res) => {
                     exit_value: 1,
                     client_pnl: 1,
                     status: 1,
-                    user_name: '$user_details.user_name',
+                    user_name: { $ifNull: ['$user_details.user_name', '$mob_num'] },
                     user_brokerage: { $ifNull: ['$user_details.brokerage', 2] },
                     createdAt: 1
                 }

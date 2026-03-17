@@ -478,6 +478,21 @@ const AdminDashboard = () => {
 
     const sortedLedger = useMemo(() => sortedData(ledger, 'entry_date'), [ledger, sortedData]);
 
+    const userMap = useMemo(() => {
+        const map = {};
+        users.forEach(u => {
+            if (u.mob_num) map[String(u.mob_num).trim()] = u.user_name;
+        });
+        return map;
+    }, [users]);
+
+    const getUserDisplayName = (mob_num, backEndName) => {
+        if (backEndName && isNaN(backEndName) && backEndName !== 'N/A') return backEndName;
+        const cleanMob = String(mob_num || '').trim();
+        if (userMap[cleanMob]) return userMap[cleanMob];
+        return mob_num || 'N/A';
+    };
+
 
     const thStyle = { padding: '12px', borderBottom: '2px solid var(--border)', textAlign: 'left', color: 'var(--text-muted)', fontSize: '0.8rem', textTransform: 'uppercase', cursor: 'pointer', userSelect: 'none' };
     const tdStyle = { padding: '14px 12px', borderBottom: '1px solid var(--border)', fontSize: '0.9rem' };
@@ -761,7 +776,7 @@ const AdminDashboard = () => {
                                     </div>
                                     <div className="box-table-cell" style={{ fontWeight: 'bold' }}>
                                         <span className="cell-label">User</span>
-                                        {t.user_name}
+                                        {getUserDisplayName(t.mob_num, t.user_name)}
                                     </div>
                                     <div className="box-table-cell">
                                         <span className="cell-label">Qty</span>
@@ -863,7 +878,7 @@ const AdminDashboard = () => {
                                         </div>
                                         <div className="box-table-cell" style={{ fontWeight: 'bold' }}>
                                             <span className="cell-label">User</span>
-                                            {a.user_name || a.mob_num}
+                                            {getUserDisplayName(a.mob_num, a.user_name)}
                                         </div>
                                         <div className="box-table-cell" style={{ fontWeight: 'bold' }}>
                                             <span className="cell-label">Symbol</span>
@@ -933,7 +948,7 @@ const AdminDashboard = () => {
                                     </div>
                                     <div className="box-table-cell" style={{ fontWeight: 'bold' }}>
                                         <span className="cell-label">User</span>
-                                        {l.user_name || l.mob_num}
+                                        {getUserDisplayName(l.mob_num, l.user_name)}
                                     </div>
                                     <div className="box-table-cell">
                                         <span className="cell-label">Description</span>
@@ -1346,7 +1361,7 @@ const AdminDashboard = () => {
                                     <tbody>
                                         {tradeDetailsAllocations.map(a => (
                                             <tr key={a._id} style={{ borderBottom: '1px dashed var(--border)' }}>
-                                                <td style={{ padding: '8px', fontWeight: 'bold' }}>{a.user_name || users.find(u => String(u.mob_num).replace(/^0+/, '') === String(a.mob_num).replace(/^0+/, ''))?.user_name || a.mob_num}</td>
+                                                <td style={{ padding: '8px', fontWeight: 'bold' }}>{getUserDisplayName(a.mob_num, a.user_name)}</td>
                                                 <td style={{ padding: '8px', textAlign: 'right', fontFamily: 'monospace' }}>{a.allocation_qty}</td>
                                                 <td style={{ padding: '8px', textAlign: 'right', fontFamily: 'monospace', color: a.client_pnl >= 0 ? 'var(--success)' : 'var(--danger)' }}>
                                                     {a.status === 'CLOSED' ? `₹${a.client_pnl}` : 'OPEN'}
