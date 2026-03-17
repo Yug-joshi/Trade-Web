@@ -625,12 +625,12 @@ const AdminDashboard = () => {
                             </div>
                             {sortedMasterTrades.map(t => (
                                 <React.Fragment key={t._id}>
-                                    <div className={`box-table-row ${expandedRows.has(t._id) ? 'expanded' : ''}`} 
-                                         onClick={() => toggleRow(t._id)}
-                                         style={{ 
-                                             gridTemplateColumns: 'minmax(140px, 1fr) 1fr 1fr 1fr 1fr 1fr 100px',
-                                             borderLeft: `4px solid ${t.status === 'CLOSED' ? 'var(--danger)' : 'var(--success)'}`
-                                         }}>
+                                    <div className={`box-table-row ${expandedRows.has(t._id) ? 'expanded' : ''}`}
+                                        onClick={() => toggleRow(t._id)}
+                                        style={{
+                                            gridTemplateColumns: 'minmax(140px, 1fr) 1fr 1fr 1fr 1fr 1fr 100px',
+                                            borderLeft: `4px solid ${t.status === 'CLOSED' ? 'var(--danger)' : 'var(--success)'}`
+                                        }}>
                                         <div className="box-table-cell">
                                             <span className="cell-label">Date</span>
                                             <i className={`fas fa-chevron-${expandedRows.has(t._id) ? 'down' : 'right'}`} style={{ marginRight: '8px', color: 'var(--primary)', width: '12px' }}></i>
@@ -669,20 +669,20 @@ const AdminDashboard = () => {
                                     </div>
                                     {expandedRows.has(t._id) && (
                                         <div style={{ padding: '1rem 2rem', background: 'var(--bg-body)', borderRadius: '0 0 12px 12px', marginTop: '-12px', marginBottom: '12px', border: '1px solid var(--border)', borderTop: 'none' }}>
-                                             {/* Expanded content remains similar but styled a bit cleaner */}
-                                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
-                                                 <span style={{ fontSize: '0.85rem', fontWeight: '600' }}>Allocation Details</span>
-                                                 <div style={{ display: 'flex', gap: '10px' }}>
-                                                     {t.status === 'OPEN' && (
-                                                         <>
+                                            {/* Expanded content remains similar but styled a bit cleaner */}
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
+                                                <span style={{ fontSize: '0.85rem', fontWeight: '600' }}>Allocation Details</span>
+                                                <div style={{ display: 'flex', gap: '10px' }}>
+                                                    {t.status === 'OPEN' && (
+                                                        <>
                                                             <button className="btn" style={{ padding: '4px 10px', fontSize: '0.75rem', background: 'var(--danger)', color: 'white', border: 'none' }} onClick={(e) => { e.stopPropagation(); openCloseModal(t); }}>Close Trade</button>
                                                             <button className="btn" style={{ padding: '4px 10px', fontSize: '0.75rem', background: 'var(--warning)', color: 'white', border: 'none' }} onClick={(e) => { e.stopPropagation(); openFlagModal(t, 'TEM_CLOSE'); }}>M to M</button>
-                                                         </>
-                                                     )}
-                                                 </div>
-                                             </div>
-                                             {/* ... Allocation Table inside expanded row ... */}
-                                             {/* Keeping it simple for now, can refine further if needed */}
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            {/* ... Allocation Table inside expanded row ... */}
+                                            {/* Keeping it simple for now, can refine further if needed */}
                                         </div>
                                     )}
                                 </React.Fragment>
