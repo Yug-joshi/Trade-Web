@@ -26,8 +26,9 @@ app.use(cors({
            'https://fin-trade.netlify.app', 
            "https://smartsip.co.in",         
            "https://www.smartsip.co.in"], 
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],  // Allowed request types
-  credentials: true                           // Important if you use cookies or sessions
+              credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE'] // Allowed request types
+                            // Important if you use cookies or sessions
 }));
 
 app.use(express.json()); // Allows us to accept JSON data in the body
