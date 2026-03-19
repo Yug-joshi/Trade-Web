@@ -21,7 +21,7 @@ const app = express();
 
 // Middleware
 app.use(cors({
-  origin: ['https://trade-web-zeta.vercel.app', 'http://localhost:3000', 'http://localhost:5173', 'https://fin-trade.netlify.app/login'], // Add all possible frontend origins, no trailing slashes
+  origin: ['http://localhost:3000', 'http://localhost:5173', 'https://fin-trade.netlify.app'], // Add all possible frontend origins, no trailing slashes
   methods: ['GET', 'POST', 'PUT', 'DELETE'],  // Allowed request types
   credentials: true                           // Important if you use cookies or sessions
 }));
