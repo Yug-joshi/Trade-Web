@@ -4,7 +4,6 @@ import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 
 const Login = () => {
-    const [isAdminMode, setIsAdminMode] = useState(false);
     const [mob_num, setMobNum] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
@@ -13,14 +12,10 @@ const Login = () => {
     const handleLogin = async (e) => {
         e.preventDefault();
 
-
-
         try {
             const { data } = await api.post('/users/login', {
                 mob_num: mob_num.trim(),
-                password,
-                isAdminMode,
-                isAdmin: isAdminMode
+                password
             });
 
             localStorage.setItem('userInfo', JSON.stringify(data));
@@ -34,7 +29,6 @@ const Login = () => {
 
         } catch (err) {
             console.error("LOGIN ERROR CATCH:", err);
-            console.error("RESPONSE DATA:", err.response?.data);
             setError(err.response?.data?.msg || err.message || 'Invalid Mobile Number or Password');
         }
     };
@@ -46,7 +40,6 @@ const Login = () => {
         }}>
             <div className="card" style={{ width: '100%', maxWidth: '400px', padding: '2.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
 
-
                 <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
                     <div style={{
                         width: '48px', height: '48px', background: 'var(--primary)', borderRadius: '12px',
@@ -56,7 +49,7 @@ const Login = () => {
                     </div>
                     <h2 style={{ fontSize: '1.5rem', fontWeight: '700' }}>BrokerConnect</h2>
                     <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
-                        {isAdminMode ? 'Admin Secure Portal' : 'User Terminal'}
+                        Secure Login Terminal
                     </p>
                 </div>
 
@@ -74,7 +67,7 @@ const Login = () => {
                             value={mob_num}
                             onChange={(e) => setMobNum(e.target.value.replace(/\D/g, '').slice(0, 10))}
                             style={{ width: '100%', padding: '12px', background: 'var(--bg-body)', color: 'var(--text-main)', border: '1px solid var(--border)', borderRadius: '8px', outline: 'none' }}
-                            placeholder="Enter mobile number"
+                            placeholder="Enter 10-digit mobile number"
                             required
                         />
                     </div>
@@ -94,35 +87,12 @@ const Login = () => {
                         width: '100%', padding: '12px', fontSize: '1rem', fontWeight: '600',
                         display: 'flex', justifyContent: 'center', alignItems: 'center'
                     }}>
-                        {isAdminMode ? 'Admin Login' : 'User Login'}
+                        Login to Account
                     </button>
                 </form>
 
                 <div style={{ textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.5rem', lineHeight: '1.4' }}>
-                    {!isAdminMode ? (
-                        <span>Forgot password? Contact admin for new password.</span>
-                    ) : (
-                        <span>Please login with phone number and password provided by developer.</span>
-                    )}
-                </div>
-
-                <div style={{ borderTop: '1px solid var(--border)', paddingTop: '1.5rem', textAlign: 'center' }}>
-                    <button
-                        type="button"
-                        onClick={() => {
-                            setIsAdminMode(!isAdminMode);
-                            setError(''); // Clear error when switching
-                        }}
-                        style={{
-                            background: 'none', border: 'none', color: 'var(--primary)',
-                            fontSize: '0.9rem', fontWeight: '600', cursor: 'pointer',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                            margin: '0 auto'
-                        }}
-                    >
-                        <i className={`fas fa-${isAdminMode ? 'user' : 'user-shield'}`}></i>
-                        {isAdminMode ? 'Switch to User Login' : 'Login as Administrator'}
-                    </button>
+                    <span>Forgot password? Contact support for recovery.</span>
                 </div>
 
             </div>

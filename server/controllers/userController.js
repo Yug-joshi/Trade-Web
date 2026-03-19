@@ -60,8 +60,8 @@ const registerUser = async (req, res) => {
 // @route   POST /api/users/login
 const loginUser = async (req, res) => {
   try {
-    const { mob_num, password, isAdminMode } = req.body;
-    console.log(`[LOGIN ATTEMPT] Mob: ${mob_num}, AdminMode: ${isAdminMode}`);
+    const { mob_num, password } = req.body;
+    console.log(`[LOGIN ATTEMPT] Mob: ${mob_num}`);
 
     if (!process.env.JWT_SECRET) {
       console.error("[CRITICAL] JWT_SECRET is missing from environment variables");
@@ -72,18 +72,24 @@ const loginUser = async (req, res) => {
     let role;
 
     const mob_num_str = String(mob_num);
-    if (isAdminMode) {
-      console.log(`[LOGIN DEBUG] Looking for Admin with mob_num: ${mob_num_str}`);
-      user = await Admin.findOne({ mob_num: mob_num_str }).lean();
+    
+    // First, check if input belongs to an Admin
+    user = await Admin.findOne({ mob_num: mob_num_str }).lean();
+    if (user) {
       role = "admin";
-      if (!user) return res.status(400).json({ msg: "Admin account not found for this mobile number" });
+      console.log(`[LOGIN DEBUG] Admin found: ${user.user_name}`);
     } else {
+      // If not admin, check if it belongs to a User
       user = await User.findOne({ mob_num: mob_num_str }).lean();
-      role = user ? user.role : "user";
-      if (!user) return res.status(400).json({ msg: "User account not found for this mobile number" });
+      if (user) {
+        role = user.role || "user";
+        console.log(`[LOGIN DEBUG] User found: ${user.user_name}, Role: ${role}`);
+      }
     }
 
-    console.log(`[LOGIN DEBUG] User found: ${user.user_name}, Role: ${role}`);
+    if (!user) {
+      return res.status(400).json({ msg: "Account not found for this mobile number" });
+    }
 
     const isMatch = await bcrypt.compare(password, user.password);
     console.log(`[LOGIN DEBUG] Password match: ${isMatch}`);
