@@ -61,21 +61,21 @@ const loginUser = async (req, res) => {
   try {
     const { mob_num, password, isAdminMode } = req.body;
 
-    let user;
-    let role;
+    // let user;
+    // let role;
 
-    if (isAdminMode) {
-      user = await Admin.findOne({ mob_num });
-      role = "admin";
-      if (!user) return res.status(400).json({ msg: "Admin account not found for this mobile number" });
-    } else {
-      user = await User.findOne({ mob_num });
-      role = user ? user.role : null;
-      if (!user) return res.status(400).json({ msg: "User account not found for this mobile number" });
-    }
+    // if (isAdminMode) {
+    //   user = await Admin.findOne({ mob_num });
+    //   role = "admin";
+    //   if (!user) return res.status(400).json({ msg: "Admin account not found for this mobile number" });
+    // } else {
+    //   user = await User.findOne({ mob_num });
+    //   role = user ? user.role : null;
+    //   if (!user) return res.status(400).json({ msg: "User account not found for this mobile number" });
+    // }
 
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(400).json({ msg: "Invalid password" });
+    // const isMatch = await bcrypt.compare(password, user.password);
+    // if (!isMatch) return res.status(400).json({ msg: "Invalid password" });
 
     const token = jwt.sign(
       { id: user._id, mob_num: user.mob_num, role },
