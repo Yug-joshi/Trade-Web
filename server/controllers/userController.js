@@ -68,51 +68,45 @@ const loginUser = async (req, res) => {
       return res.status(500).json({ msg: "Server configuration error: JWT_SECRET missing" });
     }
 
-    let user;
-    let role;
 
     const mob_num_str = String(mob_num);
-    
-    // First, check if input belongs to an Admin
-    user = await Admin.findOne({ mob_num: mob_num_str }).lean();
-    if (user) {
-      role = "admin";
-      console.log(`[LOGIN DEBUG] Admin found: ${user.user_name}`);
-    } else {
-      // If not admin, check if it belongs to a User
-      user = await User.findOne({ mob_num: mob_num_str }).lean();
-      if (user) {
-        role = user.role || "user";
-        console.log(`[LOGIN DEBUG] User found: ${user.user_name}, Role: ${role}`);
-      }
+
+
+    // Search both collections for the mobile number
+    let account = await Admin.findOne({ mob_num: mob_num_str }).lean();
+    if (!account) {
+      account = await User.findOne({ mob_num: mob_num_str }).lean();
     }
 
-    if (!user) {
+    if (!account) {
       return res.status(400).json({ msg: "Account not found for this mobile number" });
     }
 
-    const isMatch = await bcrypt.compare(password, user.password);
+    // Role is taken directly from the database record
+    const role = account.role || (account.client_id ? 'user' : 'admin');
+
+    const isMatch = await bcrypt.compare(password, account.password);
     console.log(`[LOGIN DEBUG] Password match: ${isMatch}`);
 
     if (!isMatch) return res.status(400).json({ msg: "Invalid password" });
 
     console.log("[LOGIN DEBUG] Attempting to sign JWT...");
     const token = jwt.sign(
-      { id: user._id, mob_num: user.mob_num, role },
+      { id: account._id, mob_num: account.mob_num, role },
       process.env.JWT_SECRET,
       { expiresIn: "1d" }
     );
 
     const responseUser = {
-      id: user._id,
-      user_name: user.user_name,
-      mob_num: user.mob_num,
+      id: account._id,
+      user_name: account.user_name,
+      mob_num: account.mob_num,
       role
     };
 
     if (role === 'user' || role === 'client') {
-      responseUser.client_id = user.client_id;
-      responseUser.status = user.status;
+      responseUser.client_id = account.client_id;
+      responseUser.status = account.status;
     }
 
     res.json({
