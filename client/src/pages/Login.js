@@ -11,49 +11,33 @@ const Login = () => {
     const navigate = useNavigate();
 
     const handleLogin = async (e) => {
-    e.preventDefault();
-    setError(''); // Clear previous errors
+        e.preventDefault();
 
-    try {
-        const response = await api.post('/users/login', {
-            mob_num: mob_num.trim(),
-            password,
-            isAdminMode,
-            isAdmin: isAdminMode
-        });
 
-        // Use optional chaining to prevent the "undefined" crash
-        const data = response?.data;
-        const user = data?.user;
 
-        if (data && user) {
+        try {
+            const { data } = await api.post('/users/login', {
+                mob_num: mob_num.trim(),
+                password,
+                isAdminMode,
+                isAdmin: isAdminMode
+            });
+
             localStorage.setItem('userInfo', JSON.stringify(data));
-
-            // Safely check roles and status
-            if (user.role === 'admin') {
+            if (data.user.role === 'admin') {
                 navigate('/admin-dashboard');
-            } else if (user.status === 'active') {
+            } else if (data.user.status === 'active') {
                 navigate('/Dashboard');
             } else {
-                setError('Account is not active. Please contact admin.');
+                setError('Account is not active');
             }
-        } else {
-            setError('Invalid server response. Please try again.');
-        }
 
-    } catch (err) {
-        console.error("LOGIN ERROR CATCH:", err);
-        
-        // This handles cases where the server returns a 400 or 500 error
-        const errorMessage = err.response?.data?.msg || err.response?.data?.error || err.message;
-        setError(errorMessage || 'Invalid Mobile Number or Password');
-        
-        // Detailed log to help you debug in the console
-        if (err.response) {
-            console.error("Server responded with:", err.response.data);
+        } catch (err) {
+            console.error("LOGIN ERROR CATCH:", err);
+            console.error("RESPONSE DATA:", err.response?.data);
+            setError(err.response?.data?.msg || err.message || 'Invalid Mobile Number or Password');
         }
-    }
-};
+    };
 
     return (
         <div style={{
