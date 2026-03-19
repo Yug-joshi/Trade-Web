@@ -21,8 +21,7 @@ router.get('/allocations', authMiddleware, isAdmin, getAllAllocations);
 router.post('/:id/allocate', authMiddleware, isAdmin, allocateTrade);
 router.post('/:id/close', authMiddleware, isAdmin, closeTrade);
 router.post('/:id/trigger-flag', authMiddleware, isAdmin, triggerFlag);
-// It must be .post(), not .put() or .patch()
-router.post('/:id/trigger-flag', tradeController.triggerFlag);
+
 router.get('/:id/allocations', authMiddleware, isAdmin, getTradeAllocations);
 
 router.get('/my-allocations/list', authMiddleware, getClientAllocations);
