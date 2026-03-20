@@ -593,6 +593,120 @@ const getAllAllocations = async (req, res) => {
     }
 };
 
+// @desc    Partial Sell an individual user allocation
+// @route   POST /api/trades/allocations/:id/partial-sell
+const partialSellAllocation = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const sell_qty = Number(req.body.sell_qty);
+        const sell_price = Number(req.body.sell_price);
+
+        if (isNaN(sell_qty) || isNaN(sell_price)) {
+            return res.status(400).json({ message: "Invalid quantity or price" });
+        }
+
+        const originalAlloc = await AllocationTrade.findById(id);
+        if (!originalAlloc) return res.status(404).json({ message: "Allocation not found" });
+        if (originalAlloc.status === 'CLOSED') return res.status(400).json({ message: "Allocation already closed" });
+        if (sell_qty >= originalAlloc.allocation_qty) return res.status(400).json({ message: "Sell quantity must be less than total allocation quantity. Use regular close for full sell." });
+
+        const user = await User.findOne({ mob_num: originalAlloc.mob_num });
+        if (!user) return res.status(404).json({ message: "User not found" });
+
+        const trade = await Trade.findById(originalAlloc.master_trade_id);
+        if (!trade) return res.status(404).json({ message: "Master trade not found" });
+
+        // Calculate values for the sold portion
+        const exit_value = sell_qty * sell_price;
+        const buy_value_of_sold_part = sell_qty * originalAlloc.allocation_price;
+        const raw_pnl = exit_value - buy_value_of_sold_part;
+
+        const user_brokerage_rate = (originalAlloc.user_brokerage_rate !== undefined) ? originalAlloc.user_brokerage_rate : (user.brokerage !== undefined ? user.brokerage : 2);
+        const sell_brokerage = exit_value * (user_brokerage_rate / 100);
+        const buy_brokerage_of_sold_part = buy_value_of_sold_part * (user_brokerage_rate / 100);
+        const final_client_pnl = raw_pnl - (buy_brokerage_of_sold_part + sell_brokerage);
+
+        // 1. Create a NEW CLOSED AllocationTrade for the sold portion
+        const closedAllocId = "AL-" + Date.now() + Math.floor(Math.random() * 1000);
+        await AllocationTrade.create({
+            allocation_id: closedAllocId,
+            master_trade_id: originalAlloc.master_trade_id,
+            mob_num: originalAlloc.mob_num,
+            allocation_qty: sell_qty,
+            allocation_price: originalAlloc.allocation_price,
+            total_value: buy_value_of_sold_part,
+            buy_brokerage: buy_brokerage_of_sold_part,
+            user_brokerage_rate,
+            sell_brokerage,
+            buy_timestamp: originalAlloc.buy_timestamp,
+            exit_price: sell_price,
+            exit_value: exit_value,
+            client_pnl: final_client_pnl,
+            status: "CLOSED",
+            sell_timestamp: new Date()
+        });
+
+        // 2. Update the ORIGINAL AllocationTrade (Remaining part stay OPEN)
+        const remainingQty = originalAlloc.allocation_qty - sell_qty;
+        originalAlloc.allocation_qty = remainingQty;
+        originalAlloc.total_value = remainingQty * originalAlloc.allocation_price;
+        originalAlloc.buy_brokerage = originalAlloc.total_value * (user_brokerage_rate / 100);
+        await originalAlloc.save();
+
+        // 3. Update User Balance
+        const return_amount = exit_value - sell_brokerage;
+        user.current_balance += return_amount;
+        await user.save();
+
+        // 4. Create Ledger Entry for the user
+        const desc = `Partial Sell (${trade.symbol}) | Sold: ${sell_qty} @ ₹${sell_price.toFixed(2)} | P&L: ₹${final_client_pnl.toFixed(2)} | Net Credit: ₹${return_amount.toFixed(2)}`;
+        await LedgerEntry.create({
+            mob_num: user.mob_num,
+            act_type: 'TRADE',
+            amt_cr: return_amount,
+            amt_dr: 0,
+            cls_balance: user.current_balance,
+            trade_id: trade._id,
+            description: desc
+        });
+
+        // 5. SPLIT Master Trade document
+        // Create a CLOSED Master Trade for the sold portion
+        const closedMasterId = "MT-" + Date.now() + Math.floor(Math.random() * 1000);
+        await Trade.create({
+            master_trade_id: closedMasterId,
+            symbol: trade.symbol,
+            total_qty: sell_qty,
+            buy_price: trade.buy_price,
+            total_cost: sell_qty * trade.buy_price,
+            buy_timestamp: trade.buy_timestamp,
+            buy_brokerage: 0,
+            sell_price: sell_price,
+            sell_timestamp: new Date(),
+            total_exit_value: sell_qty * sell_price,
+            master_pnl: (sell_qty * sell_price) - (sell_qty * trade.buy_price),
+            status: 'CLOSED',
+            allocated_qty: sell_qty
+        });
+
+        // Update Original Master Trade (reduce qty)
+        trade.total_qty -= sell_qty;
+        trade.allocated_qty -= sell_qty;
+        trade.total_cost = trade.total_qty * trade.buy_price;
+        await trade.save();
+
+        res.status(200).json({
+            message: "Partial sell successful",
+            closed_allocation_id: closedAllocId,
+            remaining_qty: remainingQty
+        });
+
+    } catch (error) {
+        console.error("Partial Sell Error:", error);
+        res.status(500).json({ message: error.message });
+    }
+};
+
 module.exports = {
     createTrade,
     allocateTrade,
@@ -602,5 +716,6 @@ module.exports = {
     getTradeAllocations,
     getCurrentTable,
     getAllAllocations,
-    triggerFlag
+    triggerFlag,
+    partialSellAllocation
 };

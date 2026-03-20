@@ -60,7 +60,11 @@ const registerUser = async (req, res) => {
 // @route   POST /api/users/login
 const loginUser = async (req, res) => {
   try {
+    if (!req.body) {
+      return res.status(400).json({ msg: "Missing request body. Ensure Content-Type is application/json" });
+    }
     const { mob_num, password } = req.body;
+
     console.log(`[LOGIN ATTEMPT] Mob: ${mob_num}`);
 
     if (!process.env.JWT_SECRET) {
