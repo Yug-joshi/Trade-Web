@@ -444,6 +444,7 @@ const getTradeAllocations = async (req, res) => {
                     allocation_price: 1,
                     total_value: 1,
                     buy_timestamp: 1,
+                    sell_timestamp: { $ifNull: ['$sell_timestamp', '$updatedAt'] },
                     exit_price: 1,
                     exit_value: 1,
                     client_pnl: 1,
@@ -580,9 +581,13 @@ const getAllAllocations = async (req, res) => {
                     exit_value: 1,
                     client_pnl: 1,
                     status: 1,
+                    buy_brokerage: 1,
+                    sell_brokerage: 1,
+                    sell_timestamp: { $ifNull: ['$sell_timestamp', '$updatedAt'] },
                     user_name: { $ifNull: ['$user_details.user_name', '$mob_num'] },
                     user_brokerage: { $ifNull: ['$user_details.brokerage', 2] },
-                    createdAt: 1
+                    createdAt: 1,
+                    updatedAt: 1
                 }
             }
         ]).sort({ createdAt: -1 });

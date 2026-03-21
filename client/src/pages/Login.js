@@ -54,7 +54,7 @@ const Login = () => {
                     }}>
                         <i className="fas fa-layer-group"></i>
                     </div>
-                    <h2 style={{ fontSize: '1.5rem', fontWeight: '700' }}>BrokerConnect</h2>
+                    <h2 style={{ fontSize: '1.5rem', fontWeight: '700' }}>Smart SIP</h2>
                     <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
                         Secure Login Terminal
                     </p>

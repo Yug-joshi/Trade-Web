@@ -1,12 +1,24 @@
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 
-const Sidebar = () => {
+const Sidebar = ({ isOpen, onClose }) => {
     const location = useLocation();
     const navigate = useNavigate();
+    const [isHovered, setIsHovered] = React.useState(false);
+
+    const userInfo = JSON.parse(localStorage.getItem('userInfo'));
+    const isAdmin = userInfo?.user?.role === 'admin';
 
     // Helper to check if link is active
-    const isActive = (path) => location.pathname === path ? 'active' : '';
+    const isActive = (path, tab = null) => {
+        const searchParams = new URLSearchParams(location.search);
+        const currentTab = searchParams.get('tab') || (path === '/admin-dashboard' ? 'dashboard' : '');
+        
+        if (tab) {
+            return location.pathname === path && currentTab === tab ? 'active' : '';
+        }
+        return location.pathname === path && !searchParams.get('tab') ? 'active' : '';
+    };
 
     // Logout Function
     const handleLogout = () => {
@@ -15,43 +27,76 @@ const Sidebar = () => {
     };
 
     return (
-        <nav className="sidebar">
+        <nav 
+            className={`sidebar ${isOpen ? 'open' : ''} ${isHovered ? 'expanded' : ''}`}
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
+        >
             <div className="logo">
-                <div style={{ width: '32px', height: '32px', background: 'var(--primary)', borderRadius: '8px', display: 'grid', placeItems: 'center', color: 'white' }}>
-                    <i className="fas fa-layer-group"></i>
+                <div style={{display: 'flex', alignItems: 'center', gap: '12px'}}>
+                    <div style={{ width: '32px', height: '32px', background: 'var(--primary)', borderRadius: '8px', display: 'grid', placeItems: 'center', color: 'white' }}>
+                        <i className={`fas ${isAdmin ? 'fa-user-shield' : 'fa-layer-group'}`}></i>
+                    </div>
+                    <span>{isAdmin ? 'Admin Panel' : 'BrokerConnect'}</span>
                 </div>
-                BrokerConnect
             </div>
 
-            <div className="nav-group">
-                <Link to="/Dashboard" className={`nav-item ${isActive('/Dashboard')}`}>
-                    <i className="fas fa-home"></i> Dashboard
-                </Link>
+            <div className="nav-group" style={{display: 'flex', flexDirection: 'column', height: '100%'}}>
+                {isAdmin ? (
+                    <>
+                        <Link to="/admin-dashboard?tab=dashboard" className={`nav-item ${isActive('/admin-dashboard', 'dashboard')}`} onClick={onClose}>
+                            <i className="fas fa-home"></i> <span>Dashboard</span>
+                        </Link>
+                        <div className="nav-label" style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-muted)', margin: '1.5rem 0 0.5rem 1rem' }}>MANAGEMENT</div>
+                        <Link to="/admin-dashboard?tab=user_detail" className={`nav-item ${isActive('/admin-dashboard', 'user_detail')}`} onClick={onClose}>
+                            <i className="fas fa-users"></i> <span>User Detail</span>
+                        </Link>
+                         <Link to="/admin-dashboard?tab=master_tbl" className={`nav-item ${isActive('/admin-dashboard', 'master_tbl')}`} onClick={onClose}>
+                            <i className="fas fa-table"></i> <span>Master TBL</span>
+                        </Link>
+                         <Link to="/admin-dashboard?tab=allocation_tbl" className={`nav-item ${isActive('/admin-dashboard', 'allocation_tbl')}`} onClick={onClose}>
+                            <i className="fas fa-tasks"></i> <span>Allocation TBL</span>
+                        </Link>
+                        <Link to="/admin-dashboard?tab=current_tbl" className={`nav-item ${isActive('/admin-dashboard', 'current_tbl')}`} onClick={onClose} style={{color: 'var(--success)'}}>
+                            <i className="fas fa-chart-line"></i> <span>Current TBL (Live)</span>
+                        </Link>
+                        <Link to="/admin-dashboard?tab=gl_ledger" className={`nav-item ${isActive('/admin-dashboard', 'gl_ledger')}`} onClick={onClose}>
+                            <i className="fas fa-file-invoice"></i> <span>GL Ledger</span>
+                        </Link>
+                    </>
+                ) : (
+                    <>
+                        <Link to="/Dashboard" className={`nav-item ${isActive('/Dashboard')}`} onClick={onClose}>
+                            <i className="fas fa-home"></i> <span>Dashboard</span>
+                        </Link>
 
-                <div className="nav-label" style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-muted)', margin: '1.5rem 0 0.5rem 1rem' }}>REPORTS</div>
+                        <div className="nav-label" style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-muted)', margin: '1.5rem 0 0.5rem 1rem' }}>REPORTS</div>
 
-                <Link to="/pnl" className={`nav-item ${isActive('/pnl')}`}>
-                    <i className="fas fa-chart-pie"></i> P/L Analysis
-                </Link>
-                <Link to="/ledger" className={`nav-item ${isActive('/ledger')}`}>
-                    <i className="fas fa-file-invoice"></i> Ledger Book
-                </Link>
-                <Link to="/trades" className={`nav-item ${isActive('/trades')}`}>
-                    <i className="fas fa-list-ul"></i> Trade History
-                </Link>
+                        <Link to="/pnl" className={`nav-item ${isActive('/pnl')}`} onClick={onClose}>
+                            <i className="fas fa-chart-pie"></i> <span>P/L Analysis</span>
+                        </Link>
+                        <Link to="/ledger" className={`nav-item ${isActive('/ledger')}`} onClick={onClose}>
+                            <i className="fas fa-file-invoice"></i> <span>Ledger Book</span>
+                        </Link>
+                        {/*
+                        <Link to="/trades" className={`nav-item ${isActive('/trades')}`} onClick={onClose}>
+                            <i className="fas fa-list-ul"></i> <span>Trade History</span>
+                        </Link>*/}
+                    </>
+                )}
 
                 <div className="nav-label" style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-muted)', margin: '1.5rem 0 0.5rem 1rem' }}>SYSTEM</div>
 
-                <Link to="/settings" className={`nav-item ${isActive('/settings')}`}>
-                    <i className="fas fa-cog"></i> Settings
+                <Link to="/settings" className={`nav-item ${isActive('/settings')}`} onClick={onClose}>
+                    <i className="fas fa-cog"></i> <span>Settings</span>
                 </Link>
-                <Link to="/rules" className={`nav-item ${isActive('/rules')}`}>
-                    <i className="fas fa-gavel"></i> Rules
+                <Link to="/rules" className={`nav-item ${isActive('/rules')}`} onClick={onClose}>
+                    <i className="fas fa-gavel"></i> <span>Rules</span>
                 </Link>
 
                 {/* Fixed Logout Button */}
                 <div className="nav-item" onClick={handleLogout} style={{ marginTop: 'auto', color: 'var(--danger)', cursor: 'pointer' }}>
-                    <i className="fas fa-sign-out-alt"></i> Logout
+                    <i className="fas fa-sign-out-alt"></i> <span>Logout</span>
                 </div>
             </div>
         </nav>

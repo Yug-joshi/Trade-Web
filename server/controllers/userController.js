@@ -318,24 +318,50 @@ const updateProfile = async (req, res) => {
 const changePassword = async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
-    let user;
+    const userId = req.user.id;
+    const userRole = req.user.role ? req.user.role.toLowerCase() : 'user';
 
-    if (req.user.role === 'admin') {
-      user = await Admin.findById(req.user.id);
-    } else {
-      user = await User.findById(req.user.id);
+    console.log(`[PASSWORD CHANGE ATTEMPT] UserID: ${userId}, Role: ${userRole}`);
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ msg: "Both current and new passwords are required" });
     }
 
-    if (!user) return res.status(404).json({ msg: "User not found" });
+    let user;
+    // Try finding in both collections if needed, but start with the one suggested by role
+    if (userRole === 'admin') {
+      user = await Admin.findById(userId);
+    } 
+    
+    if (!user) {
+      user = await User.findById(userId);
+    }
+
+    if (!user) {
+      console.error(`[PASSWORD CHANGE ERROR] User not found for ID: ${userId}`);
+      return res.status(404).json({ msg: "User account not found" });
+    }
 
     const isMatch = await bcrypt.compare(currentPassword, user.password);
-    if (!isMatch) return res.status(400).json({ msg: "Incorrect current password" });
+    console.log(`[PASSWORD CHANGE DEBUG] Current password match: ${isMatch}`);
+    
+    if (!isMatch) {
+      return res.status(400).json({ msg: "Incorrect current password" });
+    }
+
+    // New password should be different
+    const isSameAsOld = await bcrypt.compare(newPassword, user.password);
+    if (isSameAsOld) {
+      return res.status(400).json({ msg: "New password cannot be the same as current password" });
+    }
 
     user.password = await bcrypt.hash(newPassword, 10);
     await user.save();
 
+    console.log(`[PASSWORD CHANGE SUCCESS] Password updated for ID: ${userId}`);
     res.json({ msg: "Password updated successfully" });
   } catch (err) {
+    console.error("[PASSWORD CHANGE CATCH ERR]:", err);
     res.status(500).json({ error: err.message });
   }
 };

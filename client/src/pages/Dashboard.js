@@ -1,38 +1,47 @@
-// Import the codes 
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import api from '../services/api';
-import { Line, Doughnut } from 'react-chartjs-2';
-import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, ArcElement } from 'chart.js';
 import Layout from '../components/Layout';
-
-// Register ChartJS components
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, ArcElement);
 
 const Dashboard = () => {
     const [trades, setTrades] = useState([]);
+    const [ledgerEntries, setLedgerEntries] = useState([]);
     const [ledgerSummary, setLedgerSummary] = useState(null);
     const [metrics, setMetrics] = useState({
-        totalPnL: 0,
-        completedTrades: 0,
-        invested: 0,
-        currentValue: 0
+        netAssetValue: 0,
+        realizedPnL: 0,
+        unrealizedPnL: 0,
+        holdingValue: 0,
+        completedTrades: 0
     });
-
-    // 1. Fetch Data from Backend
-    // client/src/pages/Dashboard.js
 
     useEffect(() => {
         const fetchData = async () => {
             try {
-                // Updated to use the new user-specific ledger API
-                const [tradesRes, ledgerRes, statsRes] = await Promise.all([
+                const [tradesRes, ledgerEntriesRes, statsRes] = await Promise.all([
                     api.get('/trades/my-allocations/list'),
                     api.get('/user-ledger/entries'),
                     api.get('/user-ledger/summary')
                 ]);
 
-                setTrades(tradesRes.data);
-                setLedgerSummary(statsRes.data); // Correctly use the summary object
+                // Filter out fund entries
+                const validTrades = tradesRes.data.filter(t => 
+                    t.master_trade_id && 
+                    t.master_trade_id.symbol && 
+                    !t.master_trade_id.symbol.includes('FUND')
+                );
+                
+                setTrades(validTrades);
+                setLedgerSummary(statsRes.data);
+
+                // Process ledger entries for running balance
+                const sortedEntries = [...ledgerEntriesRes.data].reverse();
+                let currentBal = 0;
+                const withBalance = sortedEntries.map(entry => {
+                    currentBal += (entry.amt_cr || 0) - (entry.amt_dr || 0);
+                    return { ...entry, runningBalance: currentBal };
+                });
+                setLedgerEntries(withBalance.reverse().slice(0, 2));
 
                 calculateMetrics(tradesRes.data, statsRes.data);
             } catch (error) {
@@ -42,10 +51,7 @@ const Dashboard = () => {
         fetchData();
     }, []);
 
-
-    // 2. Calculate Dashboard Numbers on the fly using NEW schema fields
     const calculateMetrics = (data, ledger) => {
-        let pnl = ledger.previousProfit || 0;
         let completed = 0;
         let investedAmount = 0;
         let currentValueAmount = 0;
@@ -60,153 +66,190 @@ const Dashboard = () => {
             }
         });
 
+        const realizedPnL = (ledger.previousProfit || 0) + (ledger.currentPL || 0);
+        const unrealizedPnL = currentValueAmount - investedAmount;
+        const netAssetValue = (ledger.baseDeposit || 0) + realizedPnL + unrealizedPnL;
+
         setMetrics({
-            totalPnL: ledger.previousProfit + ledger.currentPL,
-            completedTrades: completed,
-            invested: investedAmount,
-            currentValue: currentValueAmount
+            netAssetValue,
+            realizedPnL,
+            unrealizedPnL,
+            holdingValue: investedAmount,
+            completedTrades: completed
         });
     };
 
-    // Chart Data Configuration
-    const lineChartData = {
-        labels: ['Oct 1', 'Oct 15', 'Oct 31', 'Nov 15', 'Nov 30'],
-        datasets: [{
-            label: 'Portfolio Value',
-            data: [500000, 515000, 530000, 520000, 500000 + metrics.totalPnL],
-            borderColor: '#4f46e5',
-            backgroundColor: 'rgba(79, 70, 229, 0.1)',
-            tension: 0.4,
-            fill: true
-        }]
+    const formatDateTime = (date) => {
+        if (!date) return '-';
+        const d = new Date(date);
+        const day = String(d.getDate()).padStart(2, '0');
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const year = String(d.getFullYear()).slice(-2);
+        const hours = String(d.getHours()).padStart(2, '0');
+        const minutes = String(d.getMinutes()).padStart(2, '0');
+        return `${day}/${month}/${year} ${hours}:${minutes}`;
     };
 
-    const doughnutData = {
-        labels: ['Equity', 'F&O', 'Cash'],
-        datasets: [{
-            data: [45, 35, 20],
-            backgroundColor: ['#4f46e5', '#10b981', '#f59e0b'],
-            borderWidth: 0
-        }]
+    const extractBrokerage = (desc) => {
+        if (!desc) return 0;
+        const match = desc.match(/Brok Paid: ([\d.]+)/);
+        return match ? parseFloat(match[1]) : 0;
     };
 
     return (
         <Layout title="Dashboard">
-            {/* Top Stats Grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
-
+            {/* Top Stats Grid - 4 Boxes */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.2rem', marginBottom: '2rem' }}>
                 <div className="card" style={{ borderLeft: '4px solid var(--primary)' }}>
-                    <div className="metric-label" style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '8px' }}>Total Balance</div>
-                    <div style={{ fontSize: '1.8rem', fontWeight: '700' }}>₹ {ledgerSummary?.totalBalance?.toLocaleString() || 0}</div>
-                    <div className="text-up" style={{ fontSize: '0.85rem', marginTop: '8px' }}>Combined Ledger Balance</div>
+                    <div className="metric-label" style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '8px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Net Asset Value</div>
+                    <div style={{ fontSize: '1.6rem', fontWeight: '800', color: 'var(--text-main)' }}>₹ {metrics.netAssetValue?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}</div>
+                    <div style={{ fontSize: '0.8rem', marginTop: '12px', color: 'var(--text-muted)', fontWeight: '500' }}>
+                        <i className="fas fa-wallet"></i> Capital + Profits
+                    </div>
                 </div>
 
                 <div className="card" style={{ borderLeft: '4px solid var(--success)' }}>
-                    <div className="metric-label" style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '8px' }}>Total P&L</div>
-                    <div className={metrics.totalPnL >= 0 ? "text-up" : "text-down"} style={{ fontSize: '1.8rem', fontWeight: '700' }}>
-                        {metrics.totalPnL >= 0 ? '+' : ''} ₹ {metrics.totalPnL.toLocaleString()}
+                    <div className="metric-label" style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '8px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Realized P&L</div>
+                    <div className={metrics.realizedPnL >= 0 ? "text-up" : "text-down"} style={{ fontSize: '1.6rem', fontWeight: '800' }}>
+                        {metrics.realizedPnL >= 0 ? '+' : ''} ₹ {metrics.realizedPnL?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}
                     </div>
-                    <div style={{ fontSize: '0.85rem', marginTop: '8px', color: 'var(--text-muted)' }}>Realized Gains</div>
-                </div>
-
-                <div className="card" style={{ borderLeft: '4px solid var(--secondary)' }}>
-                    <div className="metric-label" style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '8px' }}>Current Value</div>
-                    <h3>₹ {metrics.currentValue.toLocaleString()}</h3>
-                    <div style={{ fontSize: '0.85rem', marginTop: '8px', color: 'var(--text-muted)' }}>Invested: ₹ {metrics.invested.toLocaleString()}</div>
-                </div>
-
-            </div>
-
-            {/* Charts Section */}
-            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1.5rem', marginBottom: '2rem' }}>
-                <div className="card" style={{ height: '400px' }}>
-                    <h3 style={{ fontSize: '1rem', marginBottom: '1rem' }}>Performance Trend</h3>
-                    <div style={{ height: '320px' }}>
-                        <Line options={{ responsive: true, maintainAspectRatio: false }} data={lineChartData} />
+                    <div style={{ fontSize: '0.8rem', marginTop: '12px', color: 'var(--text-muted)', fontWeight: '500' }}>
+                        <i className="fas fa-check-circle"></i> Closed Trades
                     </div>
                 </div>
-                <div className="card" style={{ height: '400px' }}>
-                    <h3 style={{ fontSize: '1rem', marginBottom: '1rem' }}>Asset Allocation</h3>
-                    <div style={{ height: '320px', display: 'flex', justifyContent: 'center' }}>
-                        <Doughnut options={{ responsive: true, maintainAspectRatio: false }} data={doughnutData} />
+
+                <div className="card" style={{ borderLeft: '4px solid var(--warning)' }}>
+                    <div className="metric-label" style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '8px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Unrealized P&L</div>
+                    <div className={metrics.unrealizedPnL >= 0 ? "text-up" : "text-down"} style={{ fontSize: '1.6rem', fontWeight: '800' }}>
+                        {metrics.unrealizedPnL >= 0 ? '+' : ''} ₹ {metrics.unrealizedPnL?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}
+                    </div>
+                    <div style={{ fontSize: '0.8rem', marginTop: '12px', color: 'var(--text-muted)', fontWeight: '500' }}>
+                        <i className="fas fa-clock"></i> M2M Floating
+                    </div>
+                </div>
+
+                <div className="card" style={{ borderLeft: '4px solid var(--primary-dark)' }}>
+                    <div className="metric-label" style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '8px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Holding Value</div>
+                    <div style={{ fontSize: '1.6rem', fontWeight: '800', color: 'var(--text-main)' }}>₹ {metrics.holdingValue?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}</div>
+                    <div style={{ fontSize: '0.8rem', marginTop: '12px', color: 'var(--text-muted)', fontWeight: '500' }}>
+                        <i className="fas fa-briefcase"></i> Invested Capital
                     </div>
                 </div>
             </div>
 
-            {/* Recent Activity Table */}
+            {/* Open Trades Table */}
             <div className="card">
-                <h3 style={{ fontSize: '1rem', marginBottom: '1.5rem' }}>Recent Activity</h3>
-                <div className="box-table-container">
-                    <div className="box-table-header" style={{ gridTemplateColumns: 'minmax(120px, 1fr) 1.5fr 1fr 1.2fr 1fr' }}>
-                        <div>Date</div>
-                        <div>Script</div>
-                        <div>Type</div>
-                        <div>Amount</div>
-                        <div>Status</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                    <h3 style={{ fontSize: '1.1rem', fontWeight: '700' }}>Open Trades</h3>
+                    <Link to="/pnl" className="btn btn-primary" style={{ padding: '6px 12px', fontSize: '0.75rem', textDecoration: 'none' }}>View All</Link>
+                </div>
+                <div className="box-table-container" style={{ overflowX: 'auto' }}>
+                    <div className="box-table-header" style={{ gridTemplateColumns: 'minmax(140px, 1.2fr) minmax(100px, 1fr) 0.8fr 1fr 1.2fr 1fr 1.2fr', minWidth: '800px', textAlign: 'center' }}>
+                        <div style={{ borderRight: '1px solid rgba(255,255,255,0.1)', padding: '10px 5px' }}>Date</div>
+                        <div style={{ borderRight: '1px solid rgba(255,255,255,0.1)', padding: '10px 5px' }}>Symbol</div>
+                        <div style={{ borderRight: '1px solid rgba(255,255,255,0.1)', padding: '10px 5px' }}>Buy_QTY</div>
+                        <div style={{ borderRight: '1px solid rgba(255,255,255,0.1)', padding: '10px 5px' }}>Buy Price</div>
+                        <div style={{ borderRight: '1px solid rgba(255,255,255,0.1)', padding: '10px 5px' }}>Total Value</div>
+                        <div style={{ borderRight: '1px solid rgba(255,255,255,0.1)', padding: '10px 5px' }}>CMP</div>
+                        <div style={{ padding: '10px 5px' }}>P&L</div>
                     </div>
-                    {trades.slice(0, 5).map(trade => (
-                        <div className="box-table-row" key={trade._id} style={{ gridTemplateColumns: 'minmax(120px, 1fr) 1.5fr 1fr 1.2fr 1fr' }}>
-                            <div className="box-table-cell">
-                                <span className="cell-label">Date</span>
-                                {new Date(trade.buy_timestamp).toLocaleDateString()}
+                    {trades.filter(t => t.status === 'OPEN').slice(0, 2).map(trade => {
+                        const investedValue = trade.total_value || (trade.allocation_price * trade.allocation_qty);
+                        const qty = trade.allocation_qty || 0;
+                        const cmp = qty > 0 ? (trade.current_value / qty) : 0;
+                        const unrealizedPnL = (trade.current_value || 0) - investedValue;
+
+                        return (
+                            <div className="box-table-row" key={trade._id} style={{ gridTemplateColumns: 'minmax(140px, 1.2fr) minmax(100px, 1fr) 0.8fr 1fr 1.2fr 1fr 1.2fr', minWidth: '800px', textAlign: 'center', borderLeft: `4px solid ${unrealizedPnL >= 0 ? 'var(--success)' : 'var(--danger)'}`, marginBottom: '4px' }}>
+                                <div className="box-table-cell" style={{ borderRight: '1px solid var(--border)', justifyContent: 'center', fontSize: '0.8rem' }}>
+                                    <span className="cell-label">Date</span>
+                                    {formatDateTime(trade.buy_timestamp)}
+                                </div>
+                                <div className="box-table-cell" style={{ borderRight: '1px solid var(--border)', fontWeight: '700', color: 'var(--text-main)', justifyContent: 'center' }}>
+                                    <span className="cell-label">Symbol</span>
+                                    {trade.master_trade_id?.symbol}
+                                </div>
+                                <div className="box-table-cell" style={{ borderRight: '1px solid var(--border)', justifyContent: 'center' }}>
+                                    <span className="cell-label">Buy_QTY</span>
+                                    {qty}
+                                </div>
+                                <div className="box-table-cell font-mono" style={{ borderRight: '1px solid var(--border)', justifyContent: 'center' }}>
+                                    <span className="cell-label">Buy Price</span>
+                                    ₹{Number(trade.allocation_price || 0).toFixed(2)}
+                                </div>
+                                <div className="box-table-cell font-mono" style={{ borderRight: '1px solid var(--border)', justifyContent: 'center', fontWeight: 'bold' }}>
+                                    <span className="cell-label">Total Price</span>
+                                    ₹{Number(investedValue).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                </div>
+                                <div className="box-table-cell font-mono" style={{ borderRight: '1px solid var(--border)', justifyContent: 'center', fontWeight: 'bold', color: 'var(--primary)' }}>
+                                    <span className="cell-label">CMP</span>
+                                    ₹{Number(cmp || 0).toFixed(2)}
+                                </div>
+                                <div className="box-table-cell font-mono" style={{ justifyContent: 'center', fontWeight: '800', color: unrealizedPnL >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                                    <span className="cell-label">P&L</span>
+                                    {unrealizedPnL >= 0 ? '+' : ''}{Number(unrealizedPnL || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </div>
                             </div>
-                            <div className="box-table-cell" style={{ fontWeight: '700' }}>
-                                <span className="cell-label">Script</span>
-                                {trade.master_trade_id?.symbol}
-                            </div>
-                            <div className="box-table-cell">
-                                <span className="cell-label">Type</span>
-                                <span style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: '700', background: 'rgba(59, 130, 246, 0.1)', color: 'var(--primary)', textTransform: 'uppercase' }}>
-                                    BUY
-                                </span>
-                            </div>
-                            <div className="box-table-cell font-mono" style={{ fontWeight: '600' }}>
-                                <span className="cell-label">Amount</span>
-                                ₹ {(trade.total_value || 0).toLocaleString()}
-                            </div>
-                            <div className="box-table-cell">
-                                <span className="cell-label">Status</span>
-                                <span style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: '700', background: trade.status === 'CLOSED' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)', color: trade.status === 'CLOSED' ? 'var(--danger)' : 'var(--success)', textTransform: 'uppercase' }}>
-                                    {trade.status}
-                                </span>
-                            </div>
-                        </div>
-                    ))}
+                        );
+                    })}
+                    {trades.filter(t => t.status === 'OPEN').length === 0 && (
+                        <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>No open trades found.</div>
+                    )}
                 </div>
             </div>
 
             {/* Ledger Breakdown Table */}
             <div className="card" style={{ marginTop: '2rem' }}>
-                <h3 style={{ fontSize: '1rem', marginBottom: '1.5rem' }}>Ledger Summary</h3>
-                {ledgerSummary ? (
-                    <div className="box-table-container">
-                        <div className="box-table-header" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
-                            <div>Base Deposit</div>
-                            <div>Previous Profit</div>
-                            <div>Current P&L</div>
-                            <div>Total Balance</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                    <h3 style={{ fontSize: '1.1rem', fontWeight: '700' }}>Ledger Summary</h3>
+                    <Link to="/ledger" className="btn btn-primary" style={{ padding: '6px 12px', fontSize: '0.75rem', textDecoration: 'none' }}>View All</Link>
+                </div>
+                {ledgerEntries.length > 0 ? (
+                    <div className="box-table-container" style={{ overflowX: 'auto' }}>
+                        <div className="box-table-header" style={{ gridTemplateColumns: '1.2fr 2fr 1fr 1fr 1fr 1.2fr', minWidth: '800px', textAlign: 'center' }}>
+                            <div style={{ borderRight: '1px solid rgba(255,255,255,0.1)', padding: '10px 5px' }}>Date</div>
+                            <div style={{ borderRight: '1px solid rgba(255,255,255,0.1)', padding: '10px 5px' }}>Particulars</div>
+                            <div style={{ borderRight: '1px solid rgba(255,255,255,0.1)', padding: '10px 5px' }}>Brokerage</div>
+                            <div style={{ borderRight: '1px solid rgba(255,255,255,0.1)', padding: '10px 5px' }}>Debit</div>
+                            <div style={{ borderRight: '1px solid rgba(255,255,255,0.1)', padding: '10px 5px' }}>Credit</div>
+                            <div style={{ padding: '10px 5px' }}>Running Bal</div>
                         </div>
-                        <div className="box-table-row" style={{ gridTemplateColumns: 'repeat(4, 1fr)', borderLeft: '4px solid var(--primary)' }}>
-                            <div className="box-table-cell font-mono" style={{ fontWeight: '700', fontSize: '1.1rem' }}>
-                                <span className="cell-label">Base Deposit</span>
-                                ₹ {ledgerSummary.baseDeposit.toLocaleString()}
-                            </div>
-                            <div className="box-table-cell font-mono" style={{ fontWeight: '700', fontSize: '1.1rem', color: ledgerSummary.previousProfit >= 0 ? 'var(--success)' : 'var(--danger)' }}>
-                                <span className="cell-label">Prev. Profit</span>
-                                {ledgerSummary.previousProfit >= 0 ? '+' : ''}₹ {ledgerSummary.previousProfit.toLocaleString()}
-                            </div>
-                            <div className="box-table-cell font-mono" style={{ fontWeight: '700', fontSize: '1.1rem', color: ledgerSummary.currentPL >= 0 ? 'var(--success)' : 'var(--danger)' }}>
-                                <span className="cell-label">Current P&L</span>
-                                {ledgerSummary.currentPL >= 0 ? '+' : ''}₹ {ledgerSummary.currentPL.toLocaleString()}
-                            </div>
-                            <div className="box-table-cell font-mono" style={{ fontWeight: '800', fontSize: '1.3rem', color: 'var(--primary)' }}>
-                                <span className="cell-label">Total Balance</span>
-                                ₹ {ledgerSummary.totalBalance.toLocaleString()}
-                            </div>
-                        </div>
+                        {ledgerEntries.map((entry) => {
+                            const brok = extractBrokerage(entry.description);
+                            return (
+                                <div className="box-table-row" key={entry._id} style={{ gridTemplateColumns: '1.2fr 2fr 1fr 1fr 1fr 1.2fr', minWidth: '800px', textAlign: 'center', borderLeft: `4px solid ${entry.amt_cr > 0 ? 'var(--success)' : 'var(--danger)'}`, marginBottom: '4px' }}>
+                                    <div className="box-table-cell" style={{ borderRight: '1px solid var(--border)', justifyContent: 'center' }}>
+                                        <span className="cell-label">Date</span>
+                                        {formatDateTime(entry.entry_date)}
+                                    </div>
+                                    <div className="box-table-cell" style={{ borderRight: '1px solid var(--border)', justifyContent: 'center', fontSize: '0.85rem' }}>
+                                        <span className="cell-label">Particulars</span>
+                                        {entry.description}
+                                    </div>
+                                    <div className="box-table-cell font-mono" style={{ borderRight: '1px solid var(--border)', justifyContent: 'center', color: 'var(--text-muted)' }}>
+                                        <span className="cell-label">Brokerage</span>
+                                        {brok > 0 ? `₹${brok.toFixed(2)}` : '-'}
+                                    </div>
+                                    <div className="box-table-cell font-mono" style={{ borderRight: '1px solid var(--border)', justifyContent: 'center', color: 'var(--danger)' }}>
+                                        <span className="cell-label">Debit</span>
+                                        {entry.amt_dr > 0 ? `₹${entry.amt_dr.toLocaleString()}` : '-'}
+                                    </div>
+                                    <div className="box-table-cell font-mono" style={{ borderRight: '1px solid var(--border)', justifyContent: 'center', color: 'var(--success)' }}>
+                                        <span className="cell-label">Credit</span>
+                                        {entry.amt_cr > 0 ? `₹${entry.amt_cr.toLocaleString()}` : '-'}
+                                    </div>
+                                    <div className="box-table-cell font-mono" style={{ justifyContent: 'center', fontWeight: 'bold' }}>
+                                        <span className="cell-label">Balance</span>
+                                        ₹{entry.runningBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                    </div>
+                                </div>
+                            );
+                        })}
                     </div>
                 ) : (
-                    <p className="text-muted" style={{ padding: '20px', textAlign: 'center' }}>Loading ledger data...</p>
+                    <div style={{ padding: '20px', textAlign: 'center' }}>
+                        <div className="text-muted">No ledger entries found.</div>
+                    </div>
                 )}
             </div>
         </Layout>
