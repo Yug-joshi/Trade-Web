@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import api from '../services/api';
 import Layout from '../components/Layout';
+import Loader from '../components/Loader';
 
 const Trades = () => {
+    const [loading, setLoading] = useState(true);
     const [trades, setTrades] = useState([]);
     const [filteredTrades, setFilteredTrades] = useState([]);
 
@@ -15,11 +17,14 @@ const Trades = () => {
     useEffect(() => {
         const fetchTrades = async () => {
             try {
+                setLoading(true);
                 const { data } = await api.get('/trades/my-allocations/list');
                 setTrades(data);
                 setFilteredTrades(data);
             } catch (error) {
                 console.error("Error fetching trades:", error);
+            } finally {
+                setLoading(false);
             }
         };
         fetchTrades();
@@ -53,6 +58,7 @@ const Trades = () => {
 
     return (
         <Layout title="Trade History">
+            {loading && <Loader />}
             <div className="card">
                 {/* Filter Bar */}
                 <div style={{
@@ -75,10 +81,10 @@ const Trades = () => {
                     <input type="text" placeholder="Search Script..." value={search} onChange={(e) => setSearch(e.target.value)}
                         style={{ flex: 1, padding: '8px', borderRadius: '6px', border: '1px solid var(--border)', outline: 'none', minWidth: '150px' }} />
 
-                    <button className="btn btn-primary" onClick={handleFilter}>
+                    <button className="btn btn-primary" onClick={handleFilter} style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '5px' }}>
                         <i className="fas fa-search"></i> Filter
                     </button>
-                    <button className="btn" onClick={exportToExcel}>
+                    <button className="btn" onClick={exportToExcel} style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '5px' }}>
                         <i className="fas fa-file-excel"></i> Excel
                     </button>
                 </div>

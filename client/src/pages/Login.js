@@ -1,17 +1,25 @@
 // Import Files
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
+import Loader from '../components/Loader';
 
 const Login = () => {
     const [mob_num, setMobNum] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
+    const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
+
+    useEffect(() => {
+        document.title = "Smart SIP | Login";
+    }, []);
 
 
     const handleLogin = async (e) => {
         e.preventDefault();
+        setLoading(true);
+        setError('');
 
         try {
             const { data } = await api.post('/users/login', {
@@ -26,7 +34,6 @@ const Login = () => {
 
             localStorage.setItem('userInfo', JSON.stringify(data));
             if (data.user.role === 'admin') {
-
                 navigate('/admin-dashboard');
             } else if (data.user.status === 'active') {
                 navigate('/Dashboard');
@@ -37,6 +44,8 @@ const Login = () => {
         } catch (err) {
             console.error("LOGIN ERROR CATCH:", err);
             setError(err.response?.data?.msg || err.message || 'Invalid Mobile Number or Password');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -45,16 +54,18 @@ const Login = () => {
             height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
             backgroundColor: 'var(--bg-body)', color: 'var(--text-main)'
         }}>
+            {loading && <Loader message="Verifying Credentials..." />}
             <div className="card" style={{ width: '100%', maxWidth: '400px', padding: '2.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
 
                 <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
-                    <div style={{
-                        width: '48px', height: '48px', background: 'var(--primary)', borderRadius: '12px',
-                        display: 'grid', placeItems: 'center', color: 'white', fontSize: '1.5rem', margin: '0 auto 1rem'
-                    }}>
-                        <i className="fas fa-layer-group"></i>
+                    <div style={{ marginBottom: '2rem' }}>
+                        <img 
+                            src={require('../assets/logo.png')} 
+                            alt="Smart SIP Logo" 
+                            style={{ width: '120px', height: '120px', objectFit: 'contain' }}
+                        />
                     </div>
-                    <h2 style={{ fontSize: '1.5rem', fontWeight: '700' }}>Smart SIP</h2>
+                    <h2 style={{ fontSize: '1.4rem', fontWeight: '700' }}>Smart SIP</h2>
                     <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
                         Secure Login Terminal
                     </p>
@@ -92,7 +103,8 @@ const Login = () => {
                     </div>
                     <button type="submit" className="btn btn-primary" style={{
                         width: '100%', padding: '12px', fontSize: '1rem', fontWeight: '600',
-                        display: 'flex', justifyContent: 'center', alignItems: 'center'
+                        display: 'flex', justifyContent: 'center', alignItems: 'center',
+                        textAlign: 'center'
                     }}>
                         Login to Account
                     </button>

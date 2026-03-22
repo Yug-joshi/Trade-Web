@@ -1,5 +1,5 @@
 // Importing react from react
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import './App.css';
 import Dashboard from './pages/Dashboard';
@@ -14,6 +14,15 @@ import Rules from './pages/Rules';
 import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
+  useEffect(() => {
+    const theme = localStorage.getItem('appTheme') || 'light';
+    if (theme === 'dark') {
+      document.body.setAttribute('data-theme', 'dark');
+    } else {
+      document.body.removeAttribute('data-theme');
+    }
+  }, []);
+
   return (
     <Router>
       <Routes>

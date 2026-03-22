@@ -168,6 +168,49 @@ const downloadAdminReport = async (req, res) => {
             return res.status(403).json({ message: "Not authorized" });
         }
 
+        const isLedgerType = req.query.type === 'ledger';
+
+        if (isLedgerType) {
+            const [ledger, users] = await Promise.all([
+                LedgerEntry.find().sort({ entry_date: -1 }).lean(),
+                User.find().lean()
+            ]);
+
+            const userMap = {};
+            users.forEach(u => userMap[u.mob_num] = u.user_name);
+
+            const workbook = new ExcelJS.Workbook();
+            const sheet = workbook.addWorksheet('Global Ledger');
+
+            sheet.columns = [
+                { header: 'Timestamp', key: 'timestamp', width: 22 },
+                { header: 'User', key: 'user_name', width: 20 },
+                { header: 'Description', key: 'desc', width: 50 },
+                { header: 'Credit (₹)', key: 'cr', width: 12 },
+                { header: 'Debit (₹)', key: 'dr', width: 12 },
+                { header: 'Closing Bal', key: 'bal', width: 15 }
+            ];
+
+            sheet.getRow(1).font = { bold: true };
+            sheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E0E0' } };
+
+            ledger.forEach(l => {
+                sheet.addRow({
+                    timestamp: formatDateTime(l.entry_date),
+                    user_name: userMap[l.mob_num] || l.user_name || l.mob_num,
+                    desc: l.description,
+                    cr: l.amt_cr || 0,
+                    dr: l.amt_dr || 0,
+                    bal: l.cls_balance || 0
+                });
+            });
+
+            res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+            res.setHeader('Content-Disposition', `attachment; filename=Global_Ledger_Report_${Date.now()}.xlsx`);
+            await workbook.xlsx.write(res);
+            return res.end();
+        }
+
         const [trades, allocations, ledger, users] = await Promise.all([
             Trade.find().sort({ createdAt: -1 }).lean(),
             AllocationTrade.find().populate('master_trade_id', 'symbol').sort({ createdAt: -1 }).lean(),

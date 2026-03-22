@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import api from '../services/api';
 import Layout from '../components/Layout';
+import Loader from '../components/Loader';
 
 const Ledger = () => {
+    const [loading, setLoading] = useState(true);
     const [ledger, setLedger] = useState([]);
     const [runningBalance, setRunningBalance] = useState(0);
     const [userProfile, setUserProfile] = useState({ name: 'User', clientId: 'N/A' });
@@ -23,6 +25,7 @@ const Ledger = () => {
 
         const fetchLedger = async () => {
             try {
+                setLoading(true);
                 const { data } = await api.get('/user-ledger/entries');
                 console.log("RAW LEDGER DATA:", data);
                 if (!Array.isArray(data)) {
@@ -47,6 +50,8 @@ const Ledger = () => {
                 setRunningBalance(currentBal);
             } catch (error) {
                 console.error("Error fetching ledger:", error);
+            } finally {
+                setLoading(false);
             }
         };
         fetchLedger();
@@ -70,6 +75,7 @@ const Ledger = () => {
 
     return (
         <Layout title="Ledger Book">
+            {loading && <Loader />}
             <div className="card">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '10px' }}>
                     <div>
@@ -97,7 +103,7 @@ const Ledger = () => {
                         <button
                             className="btn btn-primary"
                             onClick={() => setSearchQuery(searchQueryInput)}
-                            style={{ borderRadius: '0 6px 6px 0', borderLeft: 'none', padding: '8px 16px' }}
+                            style={{ borderRadius: '0 6px 6px 0', borderLeft: 'none', padding: '8px 16px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}
                         >
                             Search
                         </button>

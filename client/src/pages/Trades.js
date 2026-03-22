@@ -47,7 +47,7 @@ const Trades = () => {
             <div className="card">
                 <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
                     <input type="text" placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} style={{ padding: '8px' }} />
-                    <button className="btn btn-primary" onClick={handleFilter}>Filter</button>
+                    <button className="btn btn-primary" onClick={handleFilter} style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>Filter</button>
                 </div>
                 <div className="box-table-container">
                     <div className="box-table-header" style={{ gridTemplateColumns: 'minmax(120px, 1fr) 1.5fr 1fr 1fr' }}>

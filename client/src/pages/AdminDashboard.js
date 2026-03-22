@@ -5,6 +5,7 @@ import { Doughnut, Pie } from 'react-chartjs-2';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
 import Rules from './Rules';
 import Layout from '../components/Layout';
+import Loader from '../components/Loader';
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
@@ -12,10 +13,11 @@ const AdminDashboard = () => {
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
 
-    const [darkMode, setDarkMode] = useState(() => localStorage.getItem('adminTheme') === 'dark');
     const activeTab = searchParams.get('tab') || 'dashboard';
     const setActiveTab = (tab) => setSearchParams({ tab });
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const [tableLoading, setTableLoading] = useState(false);
 
     // Live Database State
     const [users, setUsers] = useState([]);
@@ -73,7 +75,7 @@ const AdminDashboard = () => {
     const [flagInputs, setFlagInputs] = useState({ day: 1, activePrice: '' });
 
     // Form States
-    const [newUser, setNewUser] = useState({ user_name: '', mob_num: '', password: '', brokerage: 0, current_balance: 100000 });
+    const [newUser, setNewUser] = useState({ user_name: '', mob_num: '', password: '', brokerage: 0, current_balance: 100000, status: 'active' });
     const [editingUser, setEditingUser] = useState(null);
     const [fundsUser, setFundsUser] = useState(null);
     const [fundsAmount, setFundsAmount] = useState('');
@@ -100,17 +102,9 @@ const AdminDashboard = () => {
     const [globalFundsDescription, setGlobalFundsDescription] = useState('');
     const [allocUserSearch, setAllocUserSearch] = useState('');
 
-    useEffect(() => {
-        if (darkMode) {
-            document.body.setAttribute('data-theme', 'dark');
-            localStorage.setItem('adminTheme', 'dark');
-        } else {
-            document.body.removeAttribute('data-theme');
-            localStorage.setItem('adminTheme', 'light');
-        }
-    }, [darkMode]);
 
-    const fetchDashboardData = useCallback(async () => {
+    const fetchDashboardData = useCallback(async (isInitial = false) => {
+        if (isInitial) setLoading(true);
         try {
             const [usersRes, tradesRes, allocRes, ledgerRes] = await Promise.all([
                 api.get('/users'),
@@ -127,26 +121,31 @@ const AdminDashboard = () => {
             if (error.response?.status === 401 || error.response?.status === 403) {
                 navigate('/login');
             }
+        } finally {
+            if (isInitial) setLoading(false);
         }
     }, [navigate]);
 
-    const fetchCurrentTable = useCallback(async () => {
+    const fetchCurrentTable = useCallback(async (isSilent = false) => {
+        if (!isSilent) setTableLoading(true);
         try {
             const res = await api.get('/trades/current');
             setCurrentTrades(res.data);
         } catch (error) {
             console.error("Error fetching current table", error);
+        } finally {
+            if (!isSilent) setTableLoading(false);
         }
     }, []);
 
     useEffect(() => {
-        fetchDashboardData();
+        fetchDashboardData(true);
     }, [fetchDashboardData]);
 
     useEffect(() => {
         if (activeTab === 'current_tbl') {
             fetchCurrentTable();
-            const interval = setInterval(fetchCurrentTable, 10000); // refresh every 10s
+            const interval = setInterval(() => fetchCurrentTable(true), 10000); // silent refresh every 10s
             return () => clearInterval(interval);
         }
     }, [activeTab, fetchCurrentTable]);
@@ -159,7 +158,7 @@ const AdminDashboard = () => {
         try {
             await api.post('/users/create', newUser);
             alert("User created successfully!");
-            setNewUser({ user_name: '', mob_num: '', password: '', brokerage: 2, current_balance: 100000 });
+            setNewUser({ user_name: '', mob_num: '', password: '', brokerage: 2, current_balance: 100000, status: 'active' });
             setShowUserModal(false);
             fetchDashboardData();
         } catch (error) {
@@ -425,11 +424,15 @@ const AdminDashboard = () => {
 
     const downloadAdminExcel = async () => {
         try {
-            const response = await api.get('/reports/admin/trades', { responseType: 'blob' });
+            const isLedger = activeTab === 'gl_ledger';
+            const endpoint = isLedger ? '/reports/admin/trades?type=ledger' : '/reports/admin/trades';
+            const filename = isLedger ? `Global_Ledger_Report_${Date.now()}.xlsx` : `Admin_Trade_Report_${Date.now()}.xlsx`;
+
+            const response = await api.get(endpoint, { responseType: 'blob' });
             const url = window.URL.createObjectURL(new Blob([response.data]));
             const a = document.createElement('a');
             a.href = url;
-            a.download = `Admin_Trade_Report_${Date.now()}.xlsx`;
+            a.download = filename;
             document.body.appendChild(a);
             a.click();
             a.remove();
@@ -643,7 +646,6 @@ const AdminDashboard = () => {
                                     <option value="ALL">All Status</option>
                                     <option value="active">Active</option>
                                     <option value="inactive">Inactive</option>
-                                    <option value="closed">Closed</option>
                                 </select>
                                 <button className="btn" style={{ background: '#10b981', color: 'white', border: 'none' }} onClick={() => { setGlobalFundsType('add'); setShowGlobalFundsModal(true); }}>
                                     <i className="fas fa-arrow-down"></i> Add Funds
@@ -658,45 +660,51 @@ const AdminDashboard = () => {
                         </div>
 
                         <div className="box-table-container">
-                            <div className="box-table-header" style={{ gridTemplateColumns: 'minmax(100px, 1fr) 1.5fr 1.2fr 0.8fr 1.2fr 0.8fr 40px 120px' }}>
-                                <div onClick={() => requestSort('client_id')}>Client ID {sortConfig.key === 'client_id' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</div>
-                                <div onClick={() => requestSort('user_name')}>Name {sortConfig.key === 'user_name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</div>
-                                <div onClick={() => requestSort('mob_num')}>Mobile {sortConfig.key === 'mob_num' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</div>
-                                <div onClick={() => requestSort('brokerage')}>Brok % {sortConfig.key === 'brokerage' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</div>
-                                <div onClick={() => requestSort('current_balance')}>Balance {sortConfig.key === 'current_balance' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</div>
-                                <div onClick={() => requestSort('status')}>Status {sortConfig.key === 'status' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</div>
-                                <div>GL</div>
-                                <div>Actions</div>
+                            <div className="box-table-header" style={{ gridTemplateColumns: 'minmax(100px, 1fr) 1.5fr 1.2fr 0.8fr 1.2fr 0.8fr 40px 120px', borderBottom: '2px solid var(--primary)', gap: '0' }}>
+                                <div style={{ textAlign: 'center', borderRight: '1px solid rgba(255,255,255,0.1)', padding: '10px 5px' }} onClick={() => requestSort('client_id')}>Client ID {sortConfig.key === 'client_id' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</div>
+                                <div style={{ textAlign: 'center', borderRight: '1px solid rgba(255,255,255,0.1)', padding: '10px 5px' }} onClick={() => requestSort('user_name')}>Name {sortConfig.key === 'user_name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</div>
+                                <div style={{ textAlign: 'center', borderRight: '1px solid rgba(255,255,255,0.1)', padding: '10px 5px' }} onClick={() => requestSort('mob_num')}>Mobile {sortConfig.key === 'mob_num' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</div>
+                                <div style={{ textAlign: 'center', borderRight: '1px solid rgba(255,255,255,0.1)', padding: '10px 5px' }} onClick={() => requestSort('brokerage')}>Brok % {sortConfig.key === 'brokerage' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</div>
+                                <div style={{ textAlign: 'center', borderRight: '1px solid rgba(255,255,255,0.1)', padding: '10px 5px' }} onClick={() => requestSort('current_balance')}>Balance {sortConfig.key === 'current_balance' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</div>
+                                <div style={{ textAlign: 'center', borderRight: '1px solid rgba(255,255,255,0.1)', padding: '10px 5px' }} onClick={() => requestSort('status')}>Status {sortConfig.key === 'status' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</div>
+                                <div style={{ textAlign: 'center', borderRight: '1px solid rgba(255,255,255,0.1)', padding: '10px 5px' }}>GL</div>
+                                <div style={{ textAlign: 'center', padding: '10px 5px' }}>Actions</div>
                             </div>
                             {sortedUsers.map(u => (
-                                <div className="box-table-row" key={u._id} style={{ gridTemplateColumns: 'minmax(100px, 1fr) 1.5fr 1.2fr 0.8fr 1.2fr 0.8fr 40px 120px' }}>
-                                    <div className="box-table-cell font-mono" style={{ color: 'var(--primary)', textDecoration: 'underline' }} onClick={() => { setSelectedUserProfile(u); setShowUserProfileModal(true); }}>
+                                <div className="box-table-row" key={u._id} style={{ 
+                                    gridTemplateColumns: 'minmax(100px, 1fr) 1.5fr 1.2fr 0.8fr 1.2fr 0.8fr 40px 120px', 
+                                    gap: '0', 
+                                    borderLeft: `4px solid ${u.status === 'active' ? 'var(--success)' : 'var(--danger)'}`,
+                                    marginBottom: '4px',
+                                    background: 'var(--bg-card)'
+                                }}>
+                                    <div className="box-table-cell font-mono" style={{ color: 'var(--primary)', textDecoration: 'underline', display: 'flex', justifyContent: 'center', alignItems: 'center', borderRight: '1px solid var(--border)', padding: '10px 5px' }} onClick={() => { setSelectedUserProfile(u); setShowUserProfileModal(true); }}>
                                         <span className="cell-label">Client ID</span>
                                         {u.client_id}
                                     </div>
-                                    <div className="box-table-cell" style={{ fontWeight: 'bold' }} onClick={() => { setSelectedUserProfile(u); setShowUserProfileModal(true); }}>
+                                    <div className="box-table-cell" style={{ fontWeight: 'bold', display: 'flex', justifyContent: 'center', alignItems: 'center', borderRight: '1px solid var(--border)', padding: '10px 5px' }} onClick={() => { setSelectedUserProfile(u); setShowUserProfileModal(true); }}>
                                         <span className="cell-label">Name</span>
                                         {u.user_name}
                                     </div>
-                                    <div className="box-table-cell">
+                                    <div className="box-table-cell" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', borderRight: '1px solid var(--border)', padding: '10px 5px' }}>
                                         <span className="cell-label">Mobile</span>
                                         {u.mob_num}
                                     </div>
-                                    <div className="box-table-cell">
+                                    <div className="box-table-cell" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', borderRight: '1px solid var(--border)', padding: '10px 5px' }}>
                                         <span className="cell-label">Brokerage</span>
                                         {u.brokerage !== undefined ? u.brokerage : 2}%
                                     </div>
-                                    <div className="box-table-cell font-mono">
+                                    <div className="box-table-cell font-mono" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', borderRight: '1px solid var(--border)', padding: '10px 5px' }}>
                                         <span className="cell-label">Balance</span>
                                         ₹ {(u.current_balance || 0).toLocaleString()}
                                     </div>
-                                    <div className="box-table-cell">
+                                    <div className="box-table-cell" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', borderRight: '1px solid var(--border)', padding: '10px 5px' }}>
                                         <span className="cell-label">Status</span>
                                         <span style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.7rem', background: u.status === 'active' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)', color: u.status === 'active' ? 'var(--success)' : 'var(--danger)', fontWeight: '700', textTransform: 'uppercase' }}>
                                             {u.status}
                                         </span>
                                     </div>
-                                    <div className="box-table-cell" style={{ display: 'flex', justifyContent: 'center' }}>
+                                    <div className="box-table-cell" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', borderRight: '1px solid var(--border)', padding: '10px 5px' }}>
                                         <span className="cell-label">GL</span>
                                         <button 
                                             className="btn" 
@@ -711,7 +719,7 @@ const AdminDashboard = () => {
                                             <i className="fas fa-file-invoice"></i>
                                         </button>
                                     </div>
-                                    <div className="box-table-cell" style={{ display: 'flex', gap: '8px' }}>
+                                    <div className="box-table-cell" style={{ display: 'flex', gap: '8px', justifyContent: 'center', alignItems: 'center', padding: '10px 5px' }}>
                                         <button className="btn" style={{ padding: '6px 12px', fontSize: '0.75rem', background: 'var(--primary)', color: 'white', border: 'none' }} onClick={() => { setEditingUser(u); setShowEditUserModal(true); }}>Edit</button>
                                         <button className="btn" style={{ padding: '6px 12px', fontSize: '0.75rem', background: 'var(--success)', color: 'white', border: 'none' }} onClick={() => { setFundsUser(u); setShowFundsModal(true); }}>Funds</button>
                                     </div>
@@ -739,7 +747,7 @@ const AdminDashboard = () => {
                                     <button
                                         className="btn btn-primary"
                                         onClick={() => setMasterSearch(masterSearchInput)}
-                                        style={{ borderRadius: '0 6px 6px 0', borderLeft: 'none', padding: '8px 12px' }}
+                                        style={{ borderRadius: '0 6px 6px 0', borderLeft: 'none', padding: '8px 12px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}
                                     >
                                         <i className="fas fa-search"></i>
                                     </button>
@@ -752,12 +760,11 @@ const AdminDashboard = () => {
                                     <option value="ALL">All Status</option>
                                     <option value="OPEN">Open</option>
                                     <option value="CLOSED">Closed</option>
-                                    <option value="PERMANENT_CLOSE">Permanent Close</option>
                                 </select>
-                                <button className="btn" style={{ background: '#10b981', color: 'white', padding: '8px 12px', border: 'none' }} onClick={downloadAdminExcel}>
+                                <button className="btn" style={{ background: '#10b981', color: 'white', padding: '8px 12px', border: 'none', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '5px' }} onClick={downloadAdminExcel}>
                                     <i className="fas fa-file-excel"></i> <span className="hide-mobile">Excel</span>
                                 </button>
-                                <button className="btn btn-primary" onClick={() => setShowTradeModal(true)} style={{ padding: '8px 12px' }}>
+                                <button className="btn btn-primary" onClick={() => setShowTradeModal(true)} style={{ padding: '8px 12px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '5px' }}>
                                     <i className="fas fa-plus"></i> <span className="hide-mobile">Take Trade</span>
                                 </button>
                             </div>
@@ -812,11 +819,11 @@ const AdminDashboard = () => {
                                             </div>
                                             <div className="box-table-cell font-mono" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', borderRight: '1px solid var(--border)', padding: '10px 5px' }}>
                                                 <span className="cell-label">B_Rate</span>
-                                                ₹{t.buy_price.toFixed(2)}
+                                                ₹{(t.buy_price || 0).toFixed(2)}
                                             </div>
                                             <div className="box-table-cell font-mono" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', borderRight: '1px solid var(--border)', padding: '10px 5px' }}>
                                                 <span className="cell-label">Tot_Buy</span>
-                                                ₹{totalBuy.toFixed(2)}
+                                                ₹{(totalBuy || 0).toFixed(2)}
                                             </div>
                                             <div className="box-table-cell" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', borderRight: '1px solid var(--border)', padding: '10px 5px', fontSize: '0.7rem' }}>
                                                 <span className="cell-label">Time</span>
@@ -839,11 +846,11 @@ const AdminDashboard = () => {
                                                 {t.status === 'OPEN' && (
                                                     <div style={{ display: 'flex', gap: '4px' }}>
                                                         {(t.allocated_qty || 0) === 0 && (
-                                                            <button className="btn btn-primary" style={{ padding: '3px 6px', fontSize: '0.65rem' }} onClick={(e) => { e.stopPropagation(); openAllocateModal(t); }}>Alloc</button>
+                                                            <button className="btn btn-primary" style={{ padding: '3px 6px', fontSize: '0.65rem', display: 'flex', justifyContent: 'center', alignItems: 'center' }} onClick={(e) => { e.stopPropagation(); openAllocateModal(t); }}>Alloc</button>
                                                         )}
-                                                        <button className="btn" style={{ padding: '3px 6px', fontSize: '0.65rem', background: 'var(--primary)', color: 'white', border: 'none' }} onClick={(e) => { e.stopPropagation(); openPartialModal(null, t); }}>Pre Close</button>
-                                                        <button className="btn" style={{ padding: '3px 6px', fontSize: '0.65rem', background: 'var(--danger)', color: 'white', border: 'none' }} onClick={(e) => { e.stopPropagation(); openCloseModal(t); }}>Close</button>
-                                                        <button className="btn" style={{ padding: '3px 6px', fontSize: '0.65rem', background: 'var(--warning)', color: 'white', border: 'none' }} onClick={(e) => { e.stopPropagation(); openFlagModal(t, 'M to M'); }}>M2M</button>
+                                                        <button className="btn" style={{ padding: '3px 6px', fontSize: '0.65rem', background: 'var(--primary)', color: 'white', border: 'none', display: 'flex', justifyContent: 'center', alignItems: 'center' }} onClick={(e) => { e.stopPropagation(); openPartialModal(null, t); }}>Pre Close</button>
+                                                        <button className="btn" style={{ padding: '3px 6px', fontSize: '0.65rem', background: 'var(--danger)', color: 'white', border: 'none', display: 'flex', justifyContent: 'center', alignItems: 'center' }} onClick={(e) => { e.stopPropagation(); openCloseModal(t); }}>Close</button>
+                                                        <button className="btn" style={{ padding: '3px 6px', fontSize: '0.65rem', background: 'var(--warning)', color: 'white', border: 'none', display: 'flex', justifyContent: 'center', alignItems: 'center' }} onClick={(e) => { e.stopPropagation(); openFlagModal(t, 'M to M'); }}>M2M</button>
                                                     </div>
                                                 )}
                                             </div>
@@ -923,7 +930,10 @@ const AdminDashboard = () => {
                                 <div onClick={() => requestSort('current_price')}>CMP {sortConfig.key === 'current_price' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</div>
                                 <div onClick={() => requestSort('unrealized_pnl')}>P/L {sortConfig.key === 'unrealized_pnl' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</div>
                             </div>
-                            {sortedCurrentTrades.length === 0 ? (
+                            
+                            {tableLoading ? (
+                                <Loader type="table" />
+                            ) : sortedCurrentTrades.length === 0 ? (
                                 <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', background: 'var(--bg-card)', borderRadius: '12px', marginTop: '1rem' }}>No open trades or fetching data...</div>
                             ) : sortedCurrentTrades.map(t => (
                                 <div className="box-table-row" key={t.allocation_id} style={{ gridTemplateColumns: '1.2fr 1fr 1.2fr 0.8fr 1fr 1fr 1fr', borderLeft: `4px solid ${t.unrealized_pnl >= 0 ? 'var(--success)' : 'var(--danger)'}` }}>
@@ -945,15 +955,15 @@ const AdminDashboard = () => {
                                     </div>
                                     <div className="box-table-cell font-mono">
                                         <span className="cell-label">Avg Buy</span>
-                                        ₹{t.buy_price.toFixed(2)}
+                                        ₹{(t.buy_price || 0).toFixed(2)}
                                     </div>
                                     <div className="box-table-cell font-mono" style={{ fontWeight: 'bold', color: 'var(--primary)' }}>
                                         <span className="cell-label">CMP</span>
-                                        ₹{t.current_price.toFixed(2)}
+                                        ₹{(t.current_price || 0).toFixed(2)}
                                     </div>
-                                    <div className="box-table-cell font-mono" style={{ fontWeight: 'bold', color: t.unrealized_pnl >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                                    <div className="box-table-cell font-mono" style={{ fontWeight: 'bold', color: (t.unrealized_pnl || 0) >= 0 ? 'var(--success)' : 'var(--danger)' }}>
                                         <span className="cell-label">P/L</span>
-                                        {t.unrealized_pnl >= 0 ? '+' : ''}₹{t.unrealized_pnl.toFixed(2)}
+                                        {(t.unrealized_pnl || 0) >= 0 ? '+' : ''}₹{(t.unrealized_pnl || 0).toFixed(2)}
                                     </div>
                                 </div>
                             ))}
@@ -1029,9 +1039,8 @@ const AdminDashboard = () => {
                                 
                                 const rawSellPriceTotal = a.exit_value || 0;
                                 const sellBrokAmount = (a.sell_brokerage !== undefined && a.sell_brokerage !== 0) ? a.sell_brokerage : (isClosed ? (rawSellPriceTotal * (brokRate / 100)) : 0);
-                                const totalSell = isClosed ? (rawSellPriceTotal - sellBrokAmount) : 0;
-
-                                return (
+                                 const totalSell = isClosed ? (rawSellPriceTotal - sellBrokAmount) : 0;
+                                       return (
                                     <div className="box-table-row" key={a._id} style={{ gridTemplateColumns: '1.4fr 1.2fr 1fr 0.7fr 0.8fr 1fr 0.8fr 1fr 1.4fr 0.7fr 0.8fr 1fr 0.8fr 1fr 1.1fr 0.8fr', minWidth: '1550px', borderLeft: `4px solid ${isClosed ? (a.client_pnl >= 0 ? 'var(--success)' : 'var(--danger)') : 'var(--warning)'}`, marginBottom: '4px' }}>
                                         <div className="box-table-cell" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', borderRight: '1px solid var(--border)', padding: '10px 5px' }}>
                                             <span className="cell-label">Date</span>
@@ -1051,19 +1060,19 @@ const AdminDashboard = () => {
                                         </div>
                                         <div className="box-table-cell font-mono" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', borderRight: '1px solid var(--border)', padding: '10px 5px' }}>
                                             <span className="cell-label">B_Rate</span>
-                                            ₹{a.allocation_price.toFixed(2)}
+                                            ₹{(a.allocation_price || 0).toFixed(2)}
                                         </div>
                                         <div className="box-table-cell font-mono" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', borderRight: '1px solid var(--border)', padding: '10px 5px' }}>
                                             <span className="cell-label">Tot_Buy</span>
-                                            ₹{rawBuyVal.toFixed(2)}
+                                            ₹{(rawBuyVal || 0).toFixed(2)}
                                         </div>
                                         <div className="box-table-cell font-mono" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', borderRight: '1px solid var(--border)', padding: '10px 5px', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
                                             <span className="cell-label">B_Brok</span>
-                                            ₹{buyBrokAmount.toFixed(2)}
+                                            ₹{(buyBrokAmount || 0).toFixed(2)}
                                         </div>
                                         <div className="box-table-cell font-mono" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', borderRight: '1px solid var(--border)', padding: '10px 5px', fontWeight: '600' }}>
                                             <span className="cell-label">NBV</span>
-                                            ₹{totalBuy.toFixed(2)}
+                                            ₹{(totalBuy || 0).toFixed(2)}
                                         </div>
                                         <div className="box-table-cell" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', borderRight: '1px solid var(--border)', padding: '10px 5px', fontSize: '0.7rem' }}>
                                             <span className="cell-label">Sold Date</span>
@@ -1079,23 +1088,23 @@ const AdminDashboard = () => {
                                         </div>
                                         <div className="box-table-cell font-mono" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', borderRight: '1px solid var(--border)', padding: '10px 5px' }}>
                                             <span className="cell-label">Tot_Sell</span>
-                                            {isClosed ? `₹${rawSellPriceTotal.toFixed(2)}` : '-'}
+                                            {isClosed ? `₹${(rawSellPriceTotal || 0).toFixed(2)}` : '-'}
                                         </div>
                                         <div className="box-table-cell font-mono" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', borderRight: '1px solid var(--border)', padding: '10px 5px', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
                                             <span className="cell-label">S_Brok</span>
-                                            {isClosed ? `₹${sellBrokAmount.toFixed(2)}` : '-'}
+                                            {isClosed ? `₹${(sellBrokAmount || 0).toFixed(2)}` : '-'}
                                         </div>
                                         <div className="box-table-cell font-mono" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', borderRight: '1px solid var(--border)', padding: '10px 5px', fontWeight: 'bold' }}>
                                             <span className="cell-label">NSV</span>
-                                            {isClosed ? `₹${totalSell.toFixed(2)}` : 'OPEN'}
+                                            {isClosed ? `₹${(totalSell || 0).toFixed(2)}` : 'OPEN'}
                                         </div>
                                         <div className="box-table-cell font-mono" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', borderRight: '1px solid var(--border)', padding: '10px 5px', fontWeight: 'bold', color: isClosed ? (a.client_pnl >= 0 ? 'var(--success)' : 'var(--danger)') : 'inherit' }}>
                                             <span className="cell-label">P&L</span>
-                                            {isClosed ? `${a.client_pnl >= 0 ? '+' : ''}₹${a.client_pnl.toFixed(2)}` : '-'}
+                                            {isClosed ? `${(a.client_pnl || 0) >= 0 ? '+' : ''}₹${(a.client_pnl || 0).toFixed(2)}` : '-'}
                                         </div>
                                         <div className="box-table-cell font-mono" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '10px 5px', fontSize: '0.8rem', fontWeight: '600', color: 'var(--primary)' }}>
                                             <span className="cell-label">Tot_Brok</span>
-                                            ₹{(buyBrokAmount + sellBrokAmount).toFixed(2)}
+                                            ₹{((buyBrokAmount || 0) + (sellBrokAmount || 0)).toFixed(2)}
                                         </div>
                                     </div>
                                 );
@@ -1194,37 +1203,43 @@ const AdminDashboard = () => {
                             </div>
                         </div>
                         <div className="box-table-container">
-                            <div className="box-table-header" style={{ gridTemplateColumns: '1.2fr 1.2fr 1.5fr 1fr 1fr 1.2fr' }}>
-                                <div onClick={() => requestSort('entry_date')}>Timestamp {sortConfig.key === 'entry_date' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</div>
-                                <div onClick={() => requestSort('user_name')}>User {sortConfig.key === 'user_name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</div>
-                                <div onClick={() => requestSort('description')}>Description {sortConfig.key === 'description' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</div>
-                                <div onClick={() => requestSort('amt_cr')}>Credit {sortConfig.key === 'amt_cr' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</div>
-                                <div onClick={() => requestSort('amt_dr')}>Debit {sortConfig.key === 'amt_dr' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</div>
-                                <div onClick={() => requestSort('cls_balance')}>Closing Bal {sortConfig.key === 'cls_balance' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</div>
+                            <div className="box-table-header" style={{ gridTemplateColumns: '1.2fr 1.2fr 1.5fr 1fr 1fr 1.2fr', borderBottom: '2px solid var(--primary)', gap: '0' }}>
+                                <div style={{ textAlign: 'center', borderRight: '1px solid rgba(255,255,255,0.1)', padding: '10px 5px' }} onClick={() => requestSort('entry_date')}>Timestamp {sortConfig.key === 'entry_date' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</div>
+                                <div style={{ textAlign: 'center', borderRight: '1px solid rgba(255,255,255,0.1)', padding: '10px 5px' }} onClick={() => requestSort('user_name')}>User {sortConfig.key === 'user_name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</div>
+                                <div style={{ textAlign: 'center', borderRight: '1px solid rgba(255,255,255,0.1)', padding: '10px 5px' }} onClick={() => requestSort('description')}>Description {sortConfig.key === 'description' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</div>
+                                <div style={{ textAlign: 'center', borderRight: '1px solid rgba(255,255,255,0.1)', padding: '10px 5px' }} onClick={() => requestSort('amt_cr')}>Credit {sortConfig.key === 'amt_cr' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</div>
+                                <div style={{ textAlign: 'center', borderRight: '1px solid rgba(255,255,255,0.1)', padding: '10px 5px' }} onClick={() => requestSort('amt_dr')}>Debit {sortConfig.key === 'amt_dr' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</div>
+                                <div style={{ textAlign: 'center', padding: '10px 5px' }} onClick={() => requestSort('cls_balance')}>Closing Bal {sortConfig.key === 'cls_balance' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</div>
                             </div>
                             {sortedLedger.map(l => (
-                                <div className="box-table-row" key={l._id} style={{ gridTemplateColumns: '1.2fr 1.2fr 1.5fr 1fr 1fr 1.2fr' }}>
-                                    <div className="box-table-cell">
+                                <div className="box-table-row" key={l._id} style={{ 
+                                    gridTemplateColumns: '1.2fr 1.2fr 1.5fr 1fr 1fr 1.2fr', 
+                                    gap: '0', 
+                                    borderLeft: '4px solid var(--primary)',
+                                    marginBottom: '4px',
+                                    background: 'var(--bg-card)'
+                                }}>
+                                    <div className="box-table-cell" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', borderRight: '1px solid var(--border)', padding: '10px 5px' }}>
                                         <span className="cell-label">Timestamp</span>
                                         {formatDateTime(l.entry_date)}
                                     </div>
-                                    <div className="box-table-cell" style={{ fontWeight: 'bold' }}>
+                                    <div className="box-table-cell" style={{ fontWeight: 'bold', display: 'flex', justifyContent: 'center', alignItems: 'center', borderRight: '1px solid var(--border)', padding: '10px 5px' }}>
                                         <span className="cell-label">User</span>
                                         {getUserDisplayName(l.mob_num, l.user_name)}
                                     </div>
-                                    <div className="box-table-cell">
+                                    <div className="box-table-cell" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', borderRight: '1px solid var(--border)', padding: '10px 5px' }}>
                                         <span className="cell-label">Description</span>
                                         {l.description}
                                     </div>
-                                    <div className="box-table-cell font-mono" style={{ color: 'var(--success)' }}>
+                                    <div className="box-table-cell font-mono" style={{ color: 'var(--success)', display: 'flex', justifyContent: 'center', alignItems: 'center', borderRight: '1px solid var(--border)', padding: '10px 5px' }}>
                                         <span className="cell-label">Credit</span>
                                         {l.amt_cr > 0 ? `₹ ${l.amt_cr.toLocaleString()}` : '-'}
                                     </div>
-                                    <div className="box-table-cell font-mono" style={{ color: 'var(--danger)' }}>
+                                    <div className="box-table-cell font-mono" style={{ color: 'var(--danger)', display: 'flex', justifyContent: 'center', alignItems: 'center', borderRight: '1px solid var(--border)', padding: '10px 5px' }}>
                                         <span className="cell-label">Debit</span>
                                         {l.amt_dr > 0 ? `₹ ${l.amt_dr.toLocaleString()}` : '-'}
                                     </div>
-                                    <div className="box-table-cell font-mono" style={{ fontWeight: 'bold' }}>
+                                    <div className="box-table-cell font-mono" style={{ fontWeight: 'bold', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '10px 5px' }}>
                                         <span className="cell-label">Balance</span>
                                         ₹ {(l.cls_balance || 0).toLocaleString()}
                                     </div>
@@ -1287,8 +1302,9 @@ const AdminDashboard = () => {
     };
 
     return (
-        <Layout title="Admin Dashboard">
-            <div className={`admin-dashboard-layout ${darkMode ? 'dark' : ''}`}>
+        <Layout title={activeTab === 'dashboard' ? 'Dashboard' : activeTab.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}>
+            <div className="admin-dashboard-layout">
+                {loading && <Loader message="Accessing Secure Admin Terminal..." />}
                 
                 {/* Modals */}
                 {showUserModal && (
@@ -1311,9 +1327,31 @@ const AdminDashboard = () => {
                                 <label style={{ fontSize: '0.85rem', fontWeight: '600' }}>Initial Balance</label>
                                 <input style={inputStyle} type="number" value={newUser.current_balance} onChange={e => setNewUser({ ...newUser, current_balance: e.target.value })} />
 
+                                <label style={{ fontSize: '0.85rem', fontWeight: '600', display: 'block', marginBottom: '10px' }}>User Status</label>
+                                <div style={{ display: 'flex', gap: '20px', marginBottom: '15px' }}>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.85rem' }}>
+                                        <input 
+                                            type="radio" 
+                                            name="create_status" 
+                                            value="active" 
+                                            checked={newUser.status === 'active'} 
+                                            onChange={() => setNewUser({ ...newUser, status: 'active' })}
+                                        /> Active
+                                    </label>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.85rem' }}>
+                                        <input 
+                                            type="radio" 
+                                            name="create_status" 
+                                            value="inactive" 
+                                            checked={newUser.status === 'inactive'} 
+                                            onChange={() => setNewUser({ ...newUser, status: 'inactive' })}
+                                        /> Inactive
+                                    </label>
+                                </div>
+
                                 <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-                                    <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>Create</button>
-                                    <button type="button" className="btn" style={{ flex: 1 }} onClick={() => setShowUserModal(false)}>Cancel</button>
+                                    <button type="submit" className="btn btn-primary" style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>Create</button>
+                                    <button type="button" className="btn" style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }} onClick={() => setShowUserModal(false)}>Cancel</button>
                                 </div>
                             </form>
                         </div>
@@ -1337,9 +1375,31 @@ const AdminDashboard = () => {
                                 <label style={{ fontSize: '0.85rem', fontWeight: '600' }}>Brokerage Fee (%)</label>
                                 <input style={inputStyle} type="number" value={editingUser.brokerage !== undefined ? editingUser.brokerage : 2} onChange={e => setEditingUser({ ...editingUser, brokerage: e.target.value })} />
 
+                                <label style={{ fontSize: '0.85rem', fontWeight: '600', display: 'block', marginBottom: '10px' }}>User Status</label>
+                                <div style={{ display: 'flex', gap: '20px', marginBottom: '15px' }}>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.85rem' }}>
+                                        <input 
+                                            type="radio" 
+                                            name="edit_status" 
+                                            value="active" 
+                                            checked={editingUser.status === 'active'} 
+                                            onChange={() => setEditingUser({ ...editingUser, status: 'active' })}
+                                        /> Active
+                                    </label>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.85rem' }}>
+                                        <input 
+                                            type="radio" 
+                                            name="edit_status" 
+                                            value="inactive" 
+                                            checked={editingUser.status === 'inactive'} 
+                                            onChange={() => setEditingUser({ ...editingUser, status: 'inactive' })}
+                                        /> Inactive
+                                    </label>
+                                </div>
+
                                 <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-                                    <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>Save Changes</button>
-                                    <button type="button" className="btn" style={{ flex: 1 }} onClick={() => setShowEditUserModal(false)}>Cancel</button>
+                                    <button type="submit" className="btn btn-primary" style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>Save Changes</button>
+                                    <button type="button" className="btn" style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }} onClick={() => setShowEditUserModal(false)}>Cancel</button>
                                 </div>
                             </form>
                         </div>
@@ -1359,13 +1419,13 @@ const AdminDashboard = () => {
                                 <input style={inputStyle} type="text" value={fundsDescription} onChange={e => setFundsDescription(e.target.value)} />
 
                                 <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-                                    <button onClick={e => handleFundsSubmit(e, 'add')} disabled={isSubmitting} className="btn btn-primary" style={{ flex: 1, background: 'var(--success)', border: 'none' }}>
+                                    <button onClick={e => handleFundsSubmit(e, 'add')} disabled={isSubmitting} className="btn btn-primary" style={{ flex: 1, background: 'var(--success)', border: 'none', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
                                         {isSubmitting ? 'Wait...' : 'Add Funds'}
                                     </button>
-                                    <button onClick={e => handleFundsSubmit(e, 'withdraw')} disabled={isSubmitting} className="btn btn-primary" style={{ flex: 1, background: 'var(--danger)', border: 'none' }}>
+                                    <button onClick={e => handleFundsSubmit(e, 'withdraw')} disabled={isSubmitting} className="btn btn-primary" style={{ flex: 1, background: 'var(--danger)', border: 'none', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
                                         {isSubmitting ? 'Wait...' : 'Withdraw'}
                                     </button>
-                                    <button type="button" onClick={() => setShowFundsModal(false)} className="btn" style={{ flex: 1 }}>Cancel</button>
+                                    <button type="button" onClick={() => setShowFundsModal(false)} className="btn" style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>Cancel</button>
                                 </div>
                             </form>
                         </div>
@@ -1408,8 +1468,8 @@ const AdminDashboard = () => {
                                 <input style={inputStyle} type="number" step="0.05" value={newTrade.buy_price} onChange={e => setNewTrade({ ...newTrade, buy_price: e.target.value })} required />
 
                                 <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-                                    <button type="submit" disabled={isSubmitting} className="btn btn-primary" style={{ flex: 1 }}>{isSubmitting ? 'Wait...' : 'Confirm Trade'}</button>
-                                    <button type="button" className="btn" style={{ flex: 1 }} onClick={() => setShowTradeModal(false)}>Cancel</button>
+                                    <button type="submit" disabled={isSubmitting} className="btn btn-primary" style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>{isSubmitting ? 'Wait...' : 'Confirm Trade'}</button>
+                                    <button type="button" className="btn" style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }} onClick={() => setShowTradeModal(false)}>Cancel</button>
                                 </div>
                             </form>
                         </div>
@@ -1484,8 +1544,8 @@ const AdminDashboard = () => {
                             </div>
 
                             <div style={{ display: 'flex', gap: '10px' }}>
-                                <button onClick={submitAllocation} disabled={isSubmitting} className="btn btn-primary" style={{ flex: 1 }}>{isSubmitting ? 'Allocating...' : 'Confirm All Allocations'}</button>
-                                <button onClick={() => setShowAllocateModal(false)} className="btn" style={{ flex: 1 }}>Cancel</button>
+                                <button onClick={submitAllocation} disabled={isSubmitting} className="btn btn-primary" style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>{isSubmitting ? 'Allocating...' : 'Confirm All Allocations'}</button>
+                                <button onClick={() => setShowAllocateModal(false)} className="btn" style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>Cancel</button>
                             </div>
                         </div>
                     </div>
@@ -1495,15 +1555,15 @@ const AdminDashboard = () => {
                         <div style={modalContentStyle}>
                             <h3 style={{ marginTop: 0, marginBottom: '20px' }}>Close Master Trade: {selectedTrade.symbol}</h3>
                             <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '15px' }}>
-                                Buy Price: ₹{selectedTrade.buy_price.toFixed(2)} | Live: <strong>₹{selectedTrade.live_price || 'N/A'}</strong>
+                                Buy Price: ₹{(selectedTrade.buy_price || 0).toFixed(2)} | Live: <strong>₹{selectedTrade.live_price || 'N/A'}</strong>
                             </p>
                             <form onSubmit={(e) => { e.preventDefault(); submitCloseTrade(); }}>
                                 <label style={{ fontSize: '0.85rem', fontWeight: '600' }}>Market Selling Price</label>
                                 <input style={inputStyle} type="number" step="0.05" value={closePrice} onChange={e => setClosePrice(e.target.value)} required autoFocus />
 
                                 <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-                                    <button type="submit" disabled={isSubmitting} className="btn btn-primary" style={{ flex: 1, background: 'var(--danger)', border: 'none' }}>{isSubmitting ? 'Closing...' : 'Close Position'}</button>
-                                    <button type="button" onClick={() => setShowCloseModal(false)} className="btn" style={{ flex: 1 }}>Cancel</button>
+                                    <button type="submit" disabled={isSubmitting} className="btn btn-primary" style={{ flex: 1, background: 'var(--danger)', border: 'none', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>{isSubmitting ? 'Closing...' : 'Close Position'}</button>
+                                    <button type="button" onClick={() => setShowCloseModal(false)} className="btn" style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>Cancel</button>
                                 </div>
                             </form>
                         </div>
@@ -1522,8 +1582,8 @@ const AdminDashboard = () => {
                                 <input style={inputStyle} type="number" step="0.05" value={flagInputs.activePrice} onChange={e => setFlagInputs({ ...flagInputs, activePrice: e.target.value })} required />
 
                                 <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-                                    <button type="submit" disabled={isSubmitting} className="btn btn-primary" style={{ flex: 1 }}>{isSubmitting ? 'Wait...' : 'Confirm Action'}</button>
-                                    <button type="button" onClick={() => setShowFlagModal(false)} className="btn" style={{ flex: 1 }}>Cancel</button>
+                                    <button type="submit" disabled={isSubmitting} className="btn btn-primary" style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>{isSubmitting ? 'Wait...' : 'Confirm Action'}</button>
+                                    <button type="button" onClick={() => setShowFlagModal(false)} className="btn" style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>Cancel</button>
                                 </div>
                             </form>
                         </div>
@@ -1535,7 +1595,7 @@ const AdminDashboard = () => {
                         <div style={{ ...modalContentStyle, maxWidth: '600px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
                                 <h3 style={{ margin: 0 }}>Allocation Detail: {detailsTrade.symbol}</h3>
-                                <button className="btn" onClick={() => setShowTradeDetailsModal(false)} style={{ background: 'transparent', color: 'var(--text-muted)' }}><i className="fas fa-times"></i></button>
+                                <button className="btn" onClick={() => setShowTradeDetailsModal(false)} style={{ background: 'transparent', color: 'var(--text-muted)', display: 'flex', justifyContent: 'center', alignItems: 'center' }}><i className="fas fa-times"></i></button>
                             </div>
 
                             {tradeDetailsAllocations.length === 0 ? (
@@ -1564,7 +1624,7 @@ const AdminDashboard = () => {
                                     </table>
                                 </div>
                             )}
-                            <button className="btn btn-primary" style={{ width: '100%', marginTop: '20px' }} onClick={() => setShowTradeDetailsModal(false)}>Close</button>
+                            <button className="btn btn-primary" style={{ width: '100%', marginTop: '20px', display: 'flex', justifyContent: 'center', alignItems: 'center' }} onClick={() => setShowTradeDetailsModal(false)}>Close</button>
                         </div>
                     </div>
                 )}
@@ -1615,10 +1675,10 @@ const AdminDashboard = () => {
                                 />
 
                                 <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-                                    <button type="submit" disabled={isSubmitting} className="btn btn-primary" style={{ flex: 1, background: globalFundsType === 'add' ? '#10b981' : '#ef4444', border: 'none' }}>
+                                    <button type="submit" disabled={isSubmitting} className="btn btn-primary" style={{ flex: 1, background: globalFundsType === 'add' ? '#10b981' : '#ef4444', border: 'none', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
                                         {isSubmitting ? 'Wait...' : globalFundsType === 'add' ? 'Confirm Addition' : 'Confirm Withdrawal'}
                                     </button>
-                                    <button type="button" onClick={() => setShowGlobalFundsModal(false)} className="btn" style={{ flex: 1 }}>Cancel</button>
+                                    <button type="button" onClick={() => setShowGlobalFundsModal(false)} className="btn" style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>Cancel</button>
                                 </div>
                             </form>
                         </div>
@@ -1658,8 +1718,8 @@ const AdminDashboard = () => {
                                 <div style={{ marginBottom: '15px', padding: '10px', background: 'var(--bg-body)', borderRadius: '6px', fontSize: '0.85rem' }}>
                                     <p><strong>User:</strong> {getUserDisplayName(selectedAllocation.mob_num, selectedAllocation.user_name)}</p>
                                     <p><strong>Total Qty:</strong> {selectedAllocation.allocation_qty}</p>
-                                    <p><strong>Avg Buy:</strong> ₹{selectedAllocation.allocation_price.toFixed(2)}</p>
-                                    <button className="btn" style={{ fontSize: '0.7rem', marginTop: '5px', padding: '2px 8px' }} onClick={() => setSelectedAllocation(null)}>Change User</button>
+                                    <p><strong>Avg Buy:</strong> ₹{(selectedAllocation.allocation_price || 0).toFixed(2)}</p>
+                                    <button className="btn" style={{ fontSize: '0.7rem', marginTop: '5px', padding: '2px 8px', display: 'flex', justifyContent: 'center', alignItems: 'center' }} onClick={() => setSelectedAllocation(null)}>Change User</button>
                                 </div>
                             )}
 
@@ -1689,15 +1749,15 @@ const AdminDashboard = () => {
                                     />
 
                                     <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-                                        <button type="submit" disabled={isSubmitting} className="btn btn-primary" style={{ flex: 1 }}>
+                                        <button type="submit" disabled={isSubmitting} className="btn btn-primary" style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
                                             {isSubmitting ? 'Confirming...' : 'Execute Sell'}
                                         </button>
-                                        <button type="button" onClick={() => setShowPartialModal(false)} className="btn" style={{ flex: 1 }}>Cancel</button>
+                                        <button type="button" onClick={() => setShowPartialModal(false)} className="btn" style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>Cancel</button>
                                     </div>
                                 </form>
                             )}
                             {!selectedAllocation && (
-                                <button type="button" onClick={() => setShowPartialModal(false)} className="btn" style={{ width: '100%', marginTop: '10px' }}>Cancel</button>
+                                <button type="button" onClick={() => setShowPartialModal(false)} className="btn" style={{ width: '100%', marginTop: '10px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>Cancel</button>
                             )}
                         </div>
                     </div>
@@ -1719,10 +1779,10 @@ const AdminDashboard = () => {
                                 <p style={{ margin: '5px 0' }}><strong>Price:</strong> ₹{newTrade.buy_price}</p>
                             </div>
                             <div style={{ display: 'flex', gap: '10px' }}>
-                                <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleFinalTradeConfirm} disabled={isSubmitting}>
+                                <button className="btn btn-primary" style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }} onClick={handleFinalTradeConfirm} disabled={isSubmitting}>
                                     {isSubmitting ? 'Processing...' : 'Confirm'}
                                 </button>
-                                <button className="btn" style={{ flex: 1 }} onClick={() => setShowTradeConfirmModal(false)}>Cancel</button>
+                                <button className="btn" style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }} onClick={() => setShowTradeConfirmModal(false)}>Cancel</button>
                             </div>
                         </div>
                     </div>
@@ -1744,10 +1804,10 @@ const AdminDashboard = () => {
                                 ))}
                             </div>
                             <div style={{ display: 'flex', gap: '10px' }}>
-                                <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleFinalAllocConfirm} disabled={isSubmitting}>
+                                <button className="btn btn-primary" style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }} onClick={handleFinalAllocConfirm} disabled={isSubmitting}>
                                     {isSubmitting ? 'Allocating...' : 'Confirm'}
                                 </button>
-                                <button className="btn" style={{ flex: 1 }} onClick={() => setShowAllocConfirmModal(false)}>Cancel</button>
+                                <button className="btn" style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }} onClick={() => setShowAllocConfirmModal(false)}>Cancel</button>
                             </div>
                         </div>
                     </div>
@@ -1761,10 +1821,10 @@ const AdminDashboard = () => {
                                 Are you sure you want to close this position for <strong>{selectedTrade.symbol}</strong> at <strong>₹{closePrice}</strong>?
                             </p>
                             <div style={{ display: 'flex', gap: '10px' }}>
-                                <button className="btn btn-primary" style={{ flex: 1, background: 'var(--danger)', border: 'none' }} onClick={handleFinalCloseTrade} disabled={isSubmitting}>
+                                <button className="btn btn-primary" style={{ flex: 1, background: 'var(--danger)', border: 'none', display: 'flex', justifyContent: 'center', alignItems: 'center' }} onClick={handleFinalCloseTrade} disabled={isSubmitting}>
                                     {isSubmitting ? 'Closing...' : 'Confirm'}
                                 </button>
-                                <button className="btn" style={{ flex: 1 }} onClick={() => setShowCloseConfirmModal(false)}>Cancel</button>
+                                <button className="btn" style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }} onClick={() => setShowCloseConfirmModal(false)}>Cancel</button>
                             </div>
                         </div>
                     </div>
@@ -1778,10 +1838,10 @@ const AdminDashboard = () => {
                                 Partially selling <strong>{partialSellQty} Qty</strong> {selectedAllocation ? `for user ${getUserDisplayName(selectedAllocation.mob_num, selectedAllocation.user_name)}` : `of ${selectedTrade.symbol}`} at <strong>₹{partialSellPrice}</strong>.
                             </p>
                             <div style={{ display: 'flex', gap: '10px' }}>
-                                <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleFinalPartialSell} disabled={isSubmitting}>
+                                <button className="btn btn-primary" style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }} onClick={handleFinalPartialSell} disabled={isSubmitting}>
                                     {isSubmitting ? 'Processing...' : 'Confirm'}
                                 </button>
-                                <button className="btn" style={{ flex: 1 }} onClick={() => setShowPartialConfirmModal(false)}>Cancel</button>
+                                <button className="btn" style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }} onClick={() => setShowPartialConfirmModal(false)}>Cancel</button>
                             </div>
                         </div>
                     </div>
@@ -1795,10 +1855,10 @@ const AdminDashboard = () => {
                                 Apply <strong>{flagType}</strong> for <strong>{selectedTrade.symbol}</strong> with settlement price <strong>₹{flagInputs.activePrice}</strong> for <strong>{flagInputs.day} Days</strong>?
                             </p>
                             <div style={{ display: 'flex', gap: '10px' }}>
-                                <button className="btn btn-primary" style={{ flex: 1, background: 'var(--warning)', border: 'none' }} onClick={handleFinalFlag} disabled={isSubmitting}>
+                                <button className="btn btn-primary" style={{ flex: 1, background: 'var(--warning)', border: 'none', display: 'flex', justifyContent: 'center', alignItems: 'center' }} onClick={handleFinalFlag} disabled={isSubmitting}>
                                     {isSubmitting ? 'Wait...' : 'Confirm'}
                                 </button>
-                                <button className="btn" style={{ flex: 1 }} onClick={() => setShowFlagConfirmModal(false)}>Cancel</button>
+                                <button className="btn" style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }} onClick={() => setShowFlagConfirmModal(false)}>Cancel</button>
                             </div>
                         </div>
                     </div>

@@ -51,6 +51,10 @@ const Layout = ({ children, title }) => {
         }
     }, [darkMode]);
 
+    useEffect(() => {
+        document.title = title ? `Smart SIP | ${title}` : "Smart SIP";
+    }, [title]);
+
     return (
         <div className="app-container">
             <div className={`sidebar-overlay ${sidebarOpen ? 'show' : ''}`} onClick={() => setSidebarOpen(false)}></div>
