@@ -46,7 +46,8 @@ const registerUser = async (req, res) => {
         amt_cr: Number(req.body.current_balance),
         amt_dr: 0,
         cls_balance: Number(req.body.current_balance),
-        description: "Initial Balance Added"
+        description: "Initial Balance Added",
+        entryCategory: "FUNDS"
       });
     }
 
@@ -215,7 +216,8 @@ const addFunds = async (req, res) => {
       amt_cr: Number(amount),
       amt_dr: 0,
       cls_balance: user.current_balance,
-      description: description || "Funds Added"
+      description: description || "Funds Added",
+      entryCategory: "FUNDS"
     });
 
     await user.save();
@@ -247,7 +249,8 @@ const withdrawFunds = async (req, res) => {
       amt_cr: 0,
       amt_dr: Number(amount),
       cls_balance: user.current_balance,
-      description: description || "Funds Withdrawn"
+      description: description || "Funds Withdrawn",
+      entryCategory: "FUNDS"
     });
 
     await user.save();
@@ -264,10 +267,6 @@ const getProfile = async (req, res) => {
     let user;
     if (req.user.role === 'admin') {
       user = await Admin.findById(req.user.id).select("-password").lean();
-      if (user) {
-        const allUsers = await User.find({ role: { $ne: 'admin' } });
-        user.current_balance = allUsers.reduce((sum, u) => sum + (u.current_balance || 0), 0);
-      }
     } else {
       user = await User.findById(req.user.id).select("-password").lean();
     }
@@ -276,10 +275,6 @@ const getProfile = async (req, res) => {
     if (!user) {
       user = await Admin.findById(req.user.id).select("-password").lean() ||
         await User.findById(req.user.id).select("-password").lean();
-      if (user && user.role === 'admin') {
-        const allUsers = await User.find({ role: { $ne: 'admin' } });
-        user.current_balance = allUsers.reduce((sum, u) => sum + (u.current_balance || 0), 0);
-      }
     }
 
     if (!user) return res.status(404).json({ msg: "Profile not found" });
@@ -331,8 +326,8 @@ const changePassword = async (req, res) => {
     // Try finding in both collections if needed, but start with the one suggested by role
     if (userRole === 'admin') {
       user = await Admin.findById(userId);
-    } 
-    
+    }
+
     if (!user) {
       user = await User.findById(userId);
     }
@@ -344,7 +339,7 @@ const changePassword = async (req, res) => {
 
     const isMatch = await bcrypt.compare(currentPassword, user.password);
     console.log(`[PASSWORD CHANGE DEBUG] Current password match: ${isMatch}`);
-    
+
     if (!isMatch) {
       return res.status(400).json({ msg: "Incorrect current password" });
     }

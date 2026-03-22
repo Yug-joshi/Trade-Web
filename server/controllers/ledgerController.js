@@ -12,6 +12,9 @@ const getLedgerEntries = async (req, res) => {
         if (req.user.role !== 'admin') {
             // USER SIDE — filter strictly by their mob_num
             match.mob_num = String(req.user.mob_num);
+        } else {
+            // ADMIN SIDE - filter by desired categories
+            match.entryCategory = { $in: ['FUNDS', 'USER_PNL', 'BROKERAGE'] };
         }
 
         const entries = await LedgerEntry.aggregate([

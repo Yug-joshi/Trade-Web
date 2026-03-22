@@ -13,6 +13,7 @@ const ledgerEntrySchema = new mongoose.Schema({
     description: { type: String },
     is_admin_only: { type: Boolean, default: false },
     isM2M: { type: Boolean, default: false },
+    entryCategory: { type: String, enum: ['FUNDS', 'USER_PNL', 'BROKERAGE', 'TRADE_INIT', 'M2M', 'OTHER'], default: 'OTHER' },
     trade_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Trade' }
 }, { timestamps: true });
 

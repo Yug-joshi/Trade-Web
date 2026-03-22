@@ -17,6 +17,10 @@ const adminSchema = new mongoose.Schema({
     role: {
         type: String,
         default: "admin"
+    },
+    current_balance: {
+        type: Number,
+        default: 0
     }
 }, { timestamps: true });
 
