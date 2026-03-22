@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import api from '../services/api';
 import Layout from '../components/Layout';
+import Loader from '../components/Loader';
 
 const PnL = () => {
     const [trades, setTrades] = useState([]);
@@ -21,10 +22,13 @@ const PnL = () => {
     useEffect(() => {
         const fetchData = async () => {
             try {
+                setLoading(true);
                 const response = await api.get('/trades/my-allocations/list');
                 processPnL(response.data);
             } catch (error) {
                 console.error("Error fetching data:", error);
+            } finally {
+                setLoading(false);
             }
         };
         fetchData();
@@ -45,7 +49,14 @@ const PnL = () => {
 
         const combinedTableData = pureTrades.map(t => {
             const qty = t.allocation_qty || 0;
-            const cmp = t.status === 'OPEN' ? (qty > 0 ? (t.current_value / qty) : 0) : '-';
+            const allocationPrice = t.allocation_price || 0;
+            const totalValue = t.total_value || (allocationPrice * qty);
+            const exitValue = t.exit_value || 0;
+            const buyBrok = t.buy_brokerage || 0;
+            const sellBrok = t.sell_brokerage || 0;
+            const pnl = t.client_pnl || 0;
+
+            const cmp = t.status === 'OPEN' ? (qty > 0 ? ((t.current_value || totalValue) / qty) : 0) : '-';
             
             return {
                 id: t._id,
@@ -54,14 +65,14 @@ const PnL = () => {
                 type: 'TRADE',
                 status: t.status,
                 buy_qty: qty,
-                buy_rate: t.allocation_price,
-                net_buy: (t.total_value || (t.allocation_price * qty)) + (t.buy_brokerage || 0),
+                buy_rate: allocationPrice,
+                net_buy: totalValue + buyBrok,
                 sell_date: t.status === 'CLOSED' ? new Date(t.sell_timestamp || t.updatedAt) : null,
                 sell_qty: t.status === 'CLOSED' ? qty : '-',
                 sell_rate: t.status === 'CLOSED' ? (t.exit_price || 0) : '-',
-                net_sell: t.status === 'CLOSED' ? ((t.exit_value || 0) - (t.sell_brokerage || 0)) : '-',
+                net_sell: t.status === 'CLOSED' ? (exitValue - sellBrok) : '-',
                 cmp: cmp,
-                pnl: t.client_pnl || 0
+                pnl: pnl
             };
         }).sort((a, b) => b.buy_date - a.buy_date);
 
@@ -152,6 +163,7 @@ const PnL = () => {
 
     return (
         <Layout title="P/L Analysis">
+            {loading && <Loader />}
             {/* Stats Grid */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
                 <div className="card">
@@ -218,14 +230,14 @@ const PnL = () => {
                         <button 
                             className="btn-primary" 
                             onClick={applyFilters}
-                            style={{ padding: '8px 15px', background: '#7c8aff', border: 'none', borderRadius: '8px', display: 'flex', alignItems: 'center', fontWeight: 'bold', cursor: 'pointer', whiteSpace: 'nowrap', flex: '0 0 auto' }}
+                            style={{ padding: '8px 15px', background: '#7c8aff', border: 'none', borderRadius: '8px', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 'bold', cursor: 'pointer', whiteSpace: 'nowrap', flex: '0 0 auto' }}
                         >
                             <span style={{ marginRight: '6px' }}>🔍</span> Filter
                         </button>
                         <button 
                             className="btn-secondary" 
                             onClick={downloadReport} 
-                            style={{ padding: '8px 15px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', display: 'flex', alignItems: 'center', fontWeight: 'bold', cursor: 'pointer', whiteSpace: 'nowrap', flex: '0 0 auto' }}
+                            style={{ padding: '8px 15px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 'bold', cursor: 'pointer', whiteSpace: 'nowrap', flex: '0 0 auto' }}
                         >
                             <span style={{ marginRight: '6px' }}>📄</span> Excel
                         </button>

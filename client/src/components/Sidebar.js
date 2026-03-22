@@ -1,5 +1,7 @@
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import SidebarLogo from './SidebarLogo';
+import SidebarName from './SidebarName';
 
 const Sidebar = ({ isOpen, onClose }) => {
     const location = useLocation();
@@ -33,21 +35,19 @@ const Sidebar = ({ isOpen, onClose }) => {
             onMouseLeave={() => setIsHovered(false)}
         >
             <div className="logo">
-                <div style={{display: 'flex', alignItems: 'center', gap: '12px'}}>
-                    <div style={{ width: '32px', height: '32px', background: 'var(--primary)', borderRadius: '8px', display: 'grid', placeItems: 'center', color: 'white' }}>
-                        <i className={`fas ${isAdmin ? 'fa-user-shield' : 'fa-layer-group'}`}></i>
-                    </div>
-                    <span>{isAdmin ? 'Admin Panel' : 'BrokerConnect'}</span>
+                <div style={{display: 'flex', alignItems: 'center', gap: '10px'}}>
+                    <SidebarLogo />
+                    <SidebarName />
                 </div>
             </div>
 
-            <div className="nav-group" style={{display: 'flex', flexDirection: 'column', height: '100%'}}>
+            <div className="nav-group" style={{display: 'flex', flexDirection: 'column', flex: 1, minHeight: 'min-content', paddingBottom: '1rem'}}>
                 {isAdmin ? (
                     <>
                         <Link to="/admin-dashboard?tab=dashboard" className={`nav-item ${isActive('/admin-dashboard', 'dashboard')}`} onClick={onClose}>
                             <i className="fas fa-home"></i> <span>Dashboard</span>
                         </Link>
-                        <div className="nav-label" style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-muted)', margin: '1.5rem 0 0.5rem 1rem' }}>MANAGEMENT</div>
+                        <div className="nav-label" style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-muted)', margin: '1rem 0 0.3rem 1rem' }}>MANAGEMENT</div>
                         <Link to="/admin-dashboard?tab=user_detail" className={`nav-item ${isActive('/admin-dashboard', 'user_detail')}`} onClick={onClose}>
                             <i className="fas fa-users"></i> <span>User Detail</span>
                         </Link>
@@ -70,7 +70,7 @@ const Sidebar = ({ isOpen, onClose }) => {
                             <i className="fas fa-home"></i> <span>Dashboard</span>
                         </Link>
 
-                        <div className="nav-label" style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-muted)', margin: '1.5rem 0 0.5rem 1rem' }}>REPORTS</div>
+                        <div className="nav-label" style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-muted)', margin: '1rem 0 0.3rem 1rem' }}>REPORTS</div>
 
                         <Link to="/pnl" className={`nav-item ${isActive('/pnl')}`} onClick={onClose}>
                             <i className="fas fa-chart-pie"></i> <span>P/L Analysis</span>
@@ -85,7 +85,7 @@ const Sidebar = ({ isOpen, onClose }) => {
                     </>
                 )}
 
-                <div className="nav-label" style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-muted)', margin: '1.5rem 0 0.5rem 1rem' }}>SYSTEM</div>
+                <div className="nav-label" style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-muted)', margin: '1rem 0 0.3rem 1rem' }}>SYSTEM</div>
 
                 <Link to="/settings" className={`nav-item ${isActive('/settings')}`} onClick={onClose}>
                     <i className="fas fa-cog"></i> <span>Settings</span>

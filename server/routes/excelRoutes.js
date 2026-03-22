@@ -8,5 +8,4 @@ router.get('/pnl', authMiddleware, downloadPnLReport);
 
 // Get Admin Reports
 router.get('/admin/trades', authMiddleware, isAdmin, downloadAdminReport);
-
 module.exports = router;

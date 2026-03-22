@@ -8,7 +8,7 @@ const jwt = require("jsonwebtoken");
 // @route   POST /api/users/create
 const registerUser = async (req, res) => {
   try {
-    const { user_name, mob_num, password, brokerage } = req.body;
+    const { user_name, mob_num, password, brokerage, status } = req.body;
 
     const ADMIN_MOBILE = "1234567890";
     if (mob_num === ADMIN_MOBILE) {
@@ -36,7 +36,7 @@ const registerUser = async (req, res) => {
       added_funds: 0,
       current_balance: Number(req.body.current_balance) || 0,
       role: "user",
-      status: "active"
+      status: status || "active"
     });
 
     if (Number(req.body.current_balance) > 0) {

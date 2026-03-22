@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Layout from '../components/Layout';
 import api from '../services/api';
+import Loader from '../components/Loader';
 
 const Settings = () => {
     const [user, setUser] = useState({
@@ -23,7 +24,6 @@ const Settings = () => {
             const res = await api.get('/users/profile');
             if (res.data) {
                 setUser(res.data);
-                setUser(res.data);
                 setStatusMsg({ type: '', text: '', target: 'profile' });
             }
         } catch (err) {
@@ -31,7 +31,6 @@ const Settings = () => {
             // Try to fallback to cached user info in localStorage if API fails
             const cachedUser = JSON.parse(localStorage.getItem('userInfo'))?.user;
             if (cachedUser) {
-                setUser(prev => ({ ...prev, ...cachedUser }));
                 setUser(prev => ({ ...prev, ...cachedUser }));
             }
             setStatusMsg({ type: 'danger', text: 'Failed to sync with server. showing cached details.', target: 'profile' });
@@ -91,10 +90,7 @@ const Settings = () => {
     if (loading) {
         return (
             <Layout title="Settings">
-                <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-                    <i className="fas fa-spinner fa-spin" style={{ fontSize: '2rem', marginBottom: '1rem' }}></i>
-                    <p>Fetching your secure details...</p>
-                </div>
+                <Loader message="Fetching your secure details..." />
             </Layout>
         );
     }
@@ -219,7 +215,7 @@ const Settings = () => {
                                 type="submit" 
                                 disabled={updating} 
                                 className="btn btn-primary"
-                                style={{ padding: '12px 30px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
+                                style={{ padding: '12px 30px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', display: 'flex', justifyContent: 'center', alignItems: 'center' }}
                             >
                                 {updating ? <><i className="fas fa-spinner fa-spin"></i> Processing...</> : 'Update Secure Password'}
                             </button>

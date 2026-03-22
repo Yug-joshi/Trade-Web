@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 import Layout from '../components/Layout';
+import Loader from '../components/Loader';
 
 const Rules = ({ standalone = false }) => {
     const [rules, setRules] = useState([]);
@@ -78,7 +79,7 @@ const Rules = ({ standalone = false }) => {
         }
     };
 
-    if (loading) return <div style={{ padding: '2rem', textAlign: 'center' }}>Loading rules...</div>;
+    if (loading) return <Loader message="Fetching trading rules..." />;
 
     // Modal Styles
     const modalOverlayStyle = {
@@ -101,7 +102,7 @@ const Rules = ({ standalone = false }) => {
                     Trading Rules & Regulations
                 </h2>
                 {isAdmin && (
-                    <button className="btn btn-primary" onClick={() => handleOpenModal()}>
+                    <button className="btn btn-primary" onClick={() => handleOpenModal()} style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '5px' }}>
                         <i className="fas fa-plus"></i> Add New Rule
                     </button>
                 )}
@@ -130,10 +131,10 @@ const Rules = ({ standalone = false }) => {
                                 <h3 style={{ fontSize: '1.1rem', margin: 0, color: 'var(--primary)' }}>{index + 1}. {rule.title}</h3>
                                 {isAdmin && (
                                     <div style={{ display: 'flex', gap: '10px' }}>
-                                        <button className="btn" style={{ padding: '5px 10px', fontSize: '0.8rem', background: 'var(--bg-body)', border: '1px solid var(--border)' }} onClick={() => handleOpenModal(rule)}>
+                                        <button className="btn" style={{ padding: '5px 10px', fontSize: '0.8rem', background: 'var(--bg-body)', border: '1px solid var(--border)', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '4px' }} onClick={() => handleOpenModal(rule)}>
                                             <i className="fas fa-edit"></i> Edit
                                         </button>
-                                        <button className="btn" style={{ padding: '5px 10px', fontSize: '0.8rem', background: 'rgba(239, 68, 68, 0.1)', color: 'var(--danger)', border: 'none' }} onClick={() => handleDelete(rule._id)}>
+                                        <button className="btn" style={{ padding: '5px 10px', fontSize: '0.8rem', background: 'rgba(239, 68, 68, 0.1)', color: 'var(--danger)', border: 'none', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '4px' }} onClick={() => handleDelete(rule._id)}>
                                             <i className="fas fa-trash"></i> Delete
                                         </button>
                                     </div>
@@ -175,8 +176,8 @@ const Rules = ({ standalone = false }) => {
                             <input style={inputStyle} type="number" value={form.displayOrder} onChange={e => setForm({ ...form, displayOrder: e.target.value })} />
 
                             <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-                                <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>{editingRule ? 'Update' : 'Create'}</button>
-                                <button type="button" className="btn" style={{ flex: 1 }} onClick={() => setShowModal(false)}>Cancel</button>
+                                <button type="submit" className="btn btn-primary" style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>{editingRule ? 'Update' : 'Create'}</button>
+                                <button type="button" className="btn" style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }} onClick={() => setShowModal(false)}>Cancel</button>
                             </div>
                         </form>
                     </div>

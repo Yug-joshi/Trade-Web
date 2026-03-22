@@ -2,8 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../services/api';
 import Layout from '../components/Layout';
+import Loader from '../components/Loader';
 
 const Dashboard = () => {
+    const [loading, setLoading] = useState(true);
     const [trades, setTrades] = useState([]);
     const [ledgerEntries, setLedgerEntries] = useState([]);
     const [ledgerSummary, setLedgerSummary] = useState(null);
@@ -18,6 +20,7 @@ const Dashboard = () => {
     useEffect(() => {
         const fetchData = async () => {
             try {
+                setLoading(true);
                 const [tradesRes, ledgerEntriesRes, statsRes] = await Promise.all([
                     api.get('/trades/my-allocations/list'),
                     api.get('/user-ledger/entries'),
@@ -46,6 +49,8 @@ const Dashboard = () => {
                 calculateMetrics(tradesRes.data, statsRes.data);
             } catch (error) {
                 console.error("Error fetching user data:", error);
+            } finally {
+                setLoading(false);
             }
         };
         fetchData();
@@ -98,6 +103,7 @@ const Dashboard = () => {
 
     return (
         <Layout title="Dashboard">
+            {loading && <Loader />}
             {/* Top Stats Grid - 4 Boxes */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.2rem', marginBottom: '2rem' }}>
                 <div className="card" style={{ borderLeft: '4px solid var(--primary)' }}>
@@ -141,7 +147,7 @@ const Dashboard = () => {
             <div className="card">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                     <h3 style={{ fontSize: '1.1rem', fontWeight: '700' }}>Open Trades</h3>
-                    <Link to="/pnl" className="btn btn-primary" style={{ padding: '6px 12px', fontSize: '0.75rem', textDecoration: 'none' }}>View All</Link>
+                    <Link to="/pnl" className="btn btn-primary" style={{ padding: '6px 12px', fontSize: '0.75rem', textDecoration: 'none', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>View All</Link>
                 </div>
                 <div className="box-table-container" style={{ overflowX: 'auto' }}>
                     <div className="box-table-header" style={{ gridTemplateColumns: 'minmax(140px, 1.2fr) minmax(100px, 1fr) 0.8fr 1fr 1.2fr 1fr 1.2fr', minWidth: '800px', textAlign: 'center' }}>
@@ -202,7 +208,7 @@ const Dashboard = () => {
             <div className="card" style={{ marginTop: '2rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                     <h3 style={{ fontSize: '1.1rem', fontWeight: '700' }}>Ledger Summary</h3>
-                    <Link to="/ledger" className="btn btn-primary" style={{ padding: '6px 12px', fontSize: '0.75rem', textDecoration: 'none' }}>View All</Link>
+                    <Link to="/ledger" className="btn btn-primary" style={{ padding: '6px 12px', fontSize: '0.75rem', textDecoration: 'none', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>View All</Link>
                 </div>
                 {ledgerEntries.length > 0 ? (
                     <div className="box-table-container" style={{ overflowX: 'auto' }}>
