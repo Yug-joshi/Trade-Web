@@ -60,8 +60,8 @@ const Sidebar = ({ isOpen, onClose }) => {
                         <Link to="/admin-dashboard?tab=current_tbl" className={`nav-item ${isActive('/admin-dashboard', 'current_tbl')}`} onClick={onClose} style={{color: 'var(--success)'}}>
                             <i className="fas fa-chart-line"></i> <span>Current TBL (Live)</span>
                         </Link>
-                        <Link to="/admin-dashboard?tab=gl_ledger" className={`nav-item ${isActive('/admin-dashboard', 'gl_ledger')}`} onClick={onClose}>
-                            <i className="fas fa-file-invoice"></i> <span>GL Ledger</span>
+                        <Link to="/admin-dashboard?tab=realise_ledger" className={`nav-item ${isActive('/admin-dashboard', 'realise_ledger')}`} onClick={onClose}>
+                            <i className="fas fa-file-invoice"></i> <span>Realise Ledger</span>
                         </Link>
                     </>
                 ) : (

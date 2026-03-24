@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import api from '../services/api';
 import Layout from '../components/Layout';
 import Loader from '../components/Loader';
+import { formatDateTime } from '../utils/dateFormatter';
 
 const Dashboard = () => {
     const [loading, setLoading] = useState(true);
@@ -34,13 +35,14 @@ const Dashboard = () => {
                     !t.master_trade_id.symbol.includes('FUND')
                 );
                 
-                setTrades(validTrades);
+                setTrades(validTrades.sort((a, b) => new Date(b.buy_timestamp) - new Date(a.buy_timestamp)));
                 setLedgerSummary(statsRes.data);
 
                 // Process ledger entries for running balance
                 const sortedEntries = [...ledgerEntriesRes.data].reverse();
                 let currentBal = 0;
                 const withBalance = sortedEntries.map(entry => {
+                    const investedValue = (entry.total_value || (entry.allocation_price * entry.allocation_qty)) + (entry.buy_brokerage || 0);
                     currentBal += (entry.amt_cr || 0) - (entry.amt_dr || 0);
                     return { ...entry, runningBalance: currentBal };
                 });
@@ -68,8 +70,11 @@ const Dashboard = () => {
                 realizedPnL += (trade.client_pnl || 0);
             }
             if (trade.status === 'OPEN') {
-                investedAmount += (trade.total_value || 0);
-                unrealizedPnL += (trade.client_pnl || 0);
+                const baseValue = (trade.total_value || (trade.allocation_price * trade.allocation_qty));
+                const inclusiveValue = baseValue + (trade.buy_brokerage || 0);
+                investedAmount += inclusiveValue;
+                const currentVal = trade.current_value || baseValue;
+                unrealizedPnL += (currentVal - inclusiveValue);
             }
         });
 
@@ -84,16 +89,6 @@ const Dashboard = () => {
         });
     };
 
-    const formatDateTime = (date) => {
-        if (!date) return '-';
-        const d = new Date(date);
-        const day = String(d.getDate()).padStart(2, '0');
-        const month = String(d.getMonth() + 1).padStart(2, '0');
-        const year = String(d.getFullYear()).slice(-2);
-        const hours = String(d.getHours()).padStart(2, '0');
-        const minutes = String(d.getMinutes()).padStart(2, '0');
-        return `${day}/${month}/${year} ${hours}:${minutes}`;
-    };
 
     const extractBrokerage = (desc) => {
         if (!desc) return 0;
@@ -109,9 +104,7 @@ const Dashboard = () => {
                 <div className="card" style={{ borderLeft: '4px solid var(--primary)' }}>
                     <div className="metric-label" style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '8px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Net Asset Value</div>
                     <div style={{ fontSize: '1.6rem', fontWeight: '800', color: 'var(--text-main)' }}>₹ {metrics.netAssetValue?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}</div>
-                    <div style={{ fontSize: '0.8rem', marginTop: '12px', color: 'var(--text-muted)', fontWeight: '500' }}>
-                        <i className="fas fa-wallet"></i> Capital + Profits
-                    </div>
+                    
                 </div>
 
                 <div className="card" style={{ borderLeft: '4px solid var(--success)' }}>
@@ -119,9 +112,7 @@ const Dashboard = () => {
                     <div className={metrics.realizedPnL >= 0 ? "text-up" : "text-down"} style={{ fontSize: '1.6rem', fontWeight: '800' }}>
                         {metrics.realizedPnL >= 0 ? '+' : ''} ₹ {metrics.realizedPnL?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}
                     </div>
-                    <div style={{ fontSize: '0.8rem', marginTop: '12px', color: 'var(--text-muted)', fontWeight: '500' }}>
-                        <i className="fas fa-check-circle"></i> Closed Trades
-                    </div>
+                    
                 </div>
 
                 <div className="card" style={{ borderLeft: '4px solid var(--warning)' }}>
@@ -129,17 +120,13 @@ const Dashboard = () => {
                     <div className={metrics.unrealizedPnL >= 0 ? "text-up" : "text-down"} style={{ fontSize: '1.6rem', fontWeight: '800' }}>
                         {metrics.unrealizedPnL >= 0 ? '+' : ''} ₹ {metrics.unrealizedPnL?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}
                     </div>
-                    <div style={{ fontSize: '0.8rem', marginTop: '12px', color: 'var(--text-muted)', fontWeight: '500' }}>
-                        <i className="fas fa-clock"></i> M2M Floating
-                    </div>
+                    
                 </div>
 
                 <div className="card" style={{ borderLeft: '4px solid var(--primary-dark)' }}>
                     <div className="metric-label" style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '8px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Holding Value</div>
                     <div style={{ fontSize: '1.6rem', fontWeight: '800', color: 'var(--text-main)' }}>₹ {metrics.holdingValue?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}</div>
-                    <div style={{ fontSize: '0.8rem', marginTop: '12px', color: 'var(--text-muted)', fontWeight: '500' }}>
-                        <i className="fas fa-briefcase"></i> Invested Capital
-                    </div>
+                    
                 </div>
             </div>
 
@@ -160,10 +147,11 @@ const Dashboard = () => {
                         <div style={{ padding: '10px 5px' }}>P&L</div>
                     </div>
                     {trades.filter(t => t.status === 'OPEN').slice(0, 2).map(trade => {
-                        const investedValue = trade.total_value || (trade.allocation_price * trade.allocation_qty);
+                        const baseValue = trade.total_value || (trade.allocation_price * trade.allocation_qty);
+                        const inclusiveValue = baseValue + (trade.buy_brokerage || 0);
                         const qty = trade.allocation_qty || 0;
                         const cmp = qty > 0 ? (trade.current_value / qty) : 0;
-                        const unrealizedPnL = (trade.current_value || 0) - investedValue;
+                        const unrealizedPnL = (trade.current_value || 0) - inclusiveValue;
 
                         return (
                             <div className="box-table-row" key={trade._id} style={{ gridTemplateColumns: 'minmax(140px, 1.2fr) minmax(100px, 1fr) 0.8fr 1fr 1.2fr 1fr 1.2fr', minWidth: '800px', textAlign: 'center', borderLeft: `4px solid ${unrealizedPnL >= 0 ? 'var(--success)' : 'var(--danger)'}`, marginBottom: '4px' }}>
@@ -185,7 +173,7 @@ const Dashboard = () => {
                                 </div>
                                 <div className="box-table-cell font-mono" style={{ borderRight: '1px solid var(--border)', justifyContent: 'center', fontWeight: 'bold' }}>
                                     <span className="cell-label">Total Price</span>
-                                    ₹{Number(investedValue).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                    ₹{Number(inclusiveValue).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                                 </div>
                                 <div className="box-table-cell font-mono" style={{ borderRight: '1px solid var(--border)', justifyContent: 'center', fontWeight: 'bold', color: 'var(--primary)' }}>
                                     <span className="cell-label">CMP</span>

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import api from '../services/api';
 import Layout from '../components/Layout';
 import Loader from '../components/Loader';
+import { formatDate } from '../utils/dateFormatter';
 
 const Ledger = () => {
     const [loading, setLoading] = useState(true);
@@ -127,7 +128,7 @@ const Ledger = () => {
                             <div className="box-table-row" key={row._id} style={{ gridTemplateColumns: 'minmax(120px, 1fr) 2fr 0.8fr 1fr 1fr 1.2fr', borderLeft: `4px solid ${isCredit ? 'var(--success)' : (isDebit ? 'var(--danger)' : 'var(--border)')}` }}>
                                 <div className="box-table-cell">
                                     <span className="cell-label">Date</span>
-                                    {new Date(row.entry_date).toLocaleDateString()}
+                                    {formatDate(row.entry_date)}
                                 </div>
                                 <div className="box-table-cell">
                                     <span className="cell-label">Particulars</span>

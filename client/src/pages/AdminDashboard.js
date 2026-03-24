@@ -6,6 +6,7 @@ import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
 import Rules from './Rules';
 import Layout from '../components/Layout';
 import Loader from '../components/Loader';
+import { formatDate, formatDateTime } from '../utils/dateFormatter';
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
@@ -424,9 +425,9 @@ const AdminDashboard = () => {
 
     const downloadAdminExcel = async () => {
         try {
-            const isLedger = activeTab === 'gl_ledger';
+            const isLedger = activeTab === 'realise_ledger';
             const endpoint = isLedger ? '/reports/admin/trades?type=ledger' : '/reports/admin/trades';
-            const filename = isLedger ? `Global_Ledger_Report_${Date.now()}.xlsx` : `Admin_Trade_Report_${Date.now()}.xlsx`;
+            const filename = isLedger ? `Realise_Ledger_Report_${Date.now()}.xlsx` : `Admin_Trade_Report_${Date.now()}.xlsx`;
 
             const response = await api.get(endpoint, { responseType: 'blob' });
             const url = window.URL.createObjectURL(new Blob([response.data]));
@@ -456,9 +457,9 @@ const AdminDashboard = () => {
 
     // ----- Sorting Logic -----
     const requestSort = (key) => {
-        let direction = 'asc';
-        if (sortConfig.key === key && sortConfig.direction === 'asc') {
-            direction = 'desc';
+        let direction = 'desc';
+        if (sortConfig.key === key && sortConfig.direction === 'desc') {
+            direction = 'asc';
         }
         setSortConfig({ key, direction });
     };
@@ -492,9 +493,7 @@ const AdminDashboard = () => {
         if (userSearch.trim()) {
             const lowerQuery = userSearch.toLowerCase();
             filtered = filtered.filter(u =>
-                (u.user_name && u.user_name.toLowerCase().includes(lowerQuery)) ||
-                (u.mob_num && String(u.mob_num).toLowerCase().includes(lowerQuery)) ||
-                (u.client_id && String(u.client_id).toLowerCase().includes(lowerQuery))
+                (u.user_name && u.user_name.toLowerCase().includes(lowerQuery))
             );
         }
         if (userFilterStatus !== 'ALL') {
@@ -505,6 +504,9 @@ const AdminDashboard = () => {
 
     const sortedMasterTrades = useMemo(() => {
         let filtered = masterTrades.filter(t => {
+            // Guard against allocation records leaking into master trade list
+            if (t.mob_num || t.user_name) return false;
+            
             const matchesStatus = masterFilterStatus === 'ALL' || t.status === masterFilterStatus;
             const matchesSearch = masterSearch.trim() === '' ||
                 (t.symbol && t.symbol.toLowerCase().includes(masterSearch.toLowerCase())) ||
@@ -529,13 +531,19 @@ const AdminDashboard = () => {
         let filtered = allocations.filter(a => {
             const matchesStatus = allocFilterStatus === 'ALL' || a.status === allocFilterStatus;
             const matchesSearch = allocSearch.trim() === '' ||
-                (a.mob_num && String(a.mob_num).toLowerCase().includes(allocSearch.toLowerCase())) ||
-                (a.allocation_id && String(a.allocation_id).toLowerCase().includes(allocSearch.toLowerCase())) ||
-                (a.master_trade_id?.symbol && a.master_trade_id.symbol.toLowerCase().includes(allocSearch.toLowerCase()));
+                (getUserDisplayName(a.mob_num, a.user_name).toLowerCase().includes(allocSearch.toLowerCase()));
             return matchesStatus && matchesSearch;
         });
+        if (!sortConfig.key) {
+            return filtered.sort((a, b) => {
+                if (a.status === 'OPEN' && b.status !== 'OPEN') return -1;
+                if (a.status !== 'OPEN' && b.status === 'OPEN') return 1;
+                if (a.status === 'OPEN') return new Date(b.buy_timestamp) - new Date(a.buy_timestamp);
+                return new Date(b.sell_timestamp || b.updatedAt) - new Date(a.sell_timestamp || a.updatedAt);
+            });
+        }
         return sortedData(filtered, 'buy_timestamp');
-    }, [allocations, allocFilterStatus, allocSearch, sortedData]);
+    }, [allocations, allocFilterStatus, allocSearch, sortConfig, sortedData]);
 
     const toggleRow = (id) => {
         const newExpandedRows = new Set(expandedRows);
@@ -552,9 +560,7 @@ const AdminDashboard = () => {
         if (ledgerSearch.trim()) {
             const lowerQuery = ledgerSearch.toLowerCase();
             filtered = filtered.filter(l => 
-                (l.description && l.description.toLowerCase().includes(lowerQuery)) ||
-                (l.user_name && l.user_name.toLowerCase().includes(lowerQuery)) ||
-                (l.mob_num && String(l.mob_num).includes(lowerQuery))
+                (l.user_name && l.user_name.toLowerCase().includes(lowerQuery))
             );
         }
         return sortedData(filtered, 'entry_date');
@@ -594,25 +600,6 @@ const AdminDashboard = () => {
     const confirmOverlayStyle = { ...modalOverlayStyle, zIndex: 1100, backgroundColor: 'rgba(0,0,0,0.6)' };
 
     const renderContent = () => {
-        const formatDate = (date) => {
-            if (!date) return '-';
-            const d = new Date(date);
-            const day = String(d.getDate()).padStart(2, '0');
-            const month = String(d.getMonth() + 1).padStart(2, '0');
-            const year = String(d.getFullYear()).slice(-2);
-            return `${day}/${month}/${year}`;
-        };
-
-        const formatDateTime = (date) => {
-            if (!date) return '-';
-            const d = new Date(date);
-            const day = String(d.getDate()).padStart(2, '0');
-            const month = String(d.getMonth() + 1).padStart(2, '0');
-            const year = String(d.getFullYear()).slice(-2);
-            const hours = String(d.getHours()).padStart(2, '0');
-            const minutes = String(d.getMinutes()).padStart(2, '0');
-            return `${day}/${month}/${year} ${hours}:${minutes}`;
-        };
 
         switch (activeTab) {
             case 'user_detail':
@@ -624,7 +611,7 @@ const AdminDashboard = () => {
                                 <div style={{ display: 'flex' }}>
                                     <input
                                         type="text"
-                                        placeholder="Search User, Mobile or ID..."
+                                        placeholder="Search User..."
                                         value={userSearchInput}
                                         onChange={(e) => setUserSearchInput(e.target.value)}
                                         onKeyDown={(e) => e.key === 'Enter' && setUserSearch(userSearchInput)}
@@ -671,7 +658,7 @@ const AdminDashboard = () => {
                                 <div style={{ textAlign: 'center', padding: '10px 5px' }}>Actions</div>
                             </div>
                             {sortedUsers.map(u => (
-                                <div className="box-table-row" key={u._id} style={{ 
+                                <div className="box-table-row user-row" key={u._id} style={{ 
                                     gridTemplateColumns: 'minmax(100px, 1fr) 1.5fr 1.2fr 0.8fr 1.2fr 0.8fr 40px 120px', 
                                     gap: '0', 
                                     borderLeft: `4px solid ${u.status === 'active' ? 'var(--success)' : 'var(--danger)'}`,
@@ -738,7 +725,7 @@ const AdminDashboard = () => {
                                 <div style={{ display: 'flex' }}>
                                     <input
                                         type="text"
-                                        placeholder="Search..."
+                                        placeholder="Search Symbol..."
                                         value={masterSearchInput}
                                         onChange={(e) => setMasterSearchInput(e.target.value)}
                                         onKeyDown={(e) => e.key === 'Enter' && setMasterSearch(masterSearchInput)}
@@ -778,7 +765,7 @@ const AdminDashboard = () => {
                                 <div style={{ textAlign: 'center', borderRight: '1px solid rgba(255,255,255,0.1)', padding: '10px 5px' }} title="Total Quantity Purchased" onClick={() => requestSort('total_qty')}>BUY_QTY {sortConfig.key === 'total_qty' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</div>
                                 <div style={{ textAlign: 'center', borderRight: '1px solid rgba(255,255,255,0.1)', padding: '10px 5px' }} title="Average Buy Price" onClick={() => requestSort('buy_price')}>B_RATE</div>
                                 <div style={{ textAlign: 'center', borderRight: '1px solid rgba(255,255,255,0.1)', padding: '10px 5px' }} title="Total Buy Value (Qty * Buy Price)" onClick={() => requestSort('total_cost')}>TOT_BUY</div>
-                                <div style={{ textAlign: 'center', borderRight: '1px solid rgba(255,255,255,0.1)', padding: '10px 5px' }} title="Closing Date and Time">TIME</div>
+                                <div style={{ textAlign: 'center', borderRight: '1px solid rgba(255,255,255,0.1)', padding: '10px 5px', cursor: 'pointer' }} title="Closing Date and Time" onClick={() => requestSort('sell_timestamp')}>TIME {sortConfig.key === 'sell_timestamp' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</div>
                                 <div style={{ textAlign: 'center', borderRight: '1px solid rgba(255,255,255,0.1)', padding: '10px 5px' }} title="Total Sold Quantity" onClick={() => requestSort('allocated_qty')}>SELL_QTY</div>
                                 <div style={{ textAlign: 'center', borderRight: '1px solid rgba(255,255,255,0.1)', padding: '10px 5px' }} title="Exit/Sell Price">S_RATE</div>
                                 <div style={{ textAlign: 'center', borderRight: '1px solid rgba(255,255,255,0.1)', padding: '10px 5px' }} title="Total Exit Value (Qty * Sell Price)" onClick={() => requestSort('total_exit_value')}>TOT_SELL</div>
@@ -792,7 +779,7 @@ const AdminDashboard = () => {
 
                                 return (
                                     <React.Fragment key={t._id}>
-                                        <div className={`box-table-row ${expandedRows.has(t._id) ? 'expanded' : ''}`}
+                                        <div className={`box-table-row master-row ${expandedRows.has(t._id) ? 'expanded' : ''}`}
                                             onClick={() => toggleRow(t._id)}
                                             style={{
                                                 gridTemplateColumns: '50px 1.4fr 1.2fr 0.8fr 1.1fr 1.2fr 1.4fr 0.8fr 1.1fr 1.2fr 220px 0.9fr',
@@ -936,7 +923,7 @@ const AdminDashboard = () => {
                             ) : sortedCurrentTrades.length === 0 ? (
                                 <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', background: 'var(--bg-card)', borderRadius: '12px', marginTop: '1rem' }}>No open trades or fetching data...</div>
                             ) : sortedCurrentTrades.map(t => (
-                                <div className="box-table-row" key={t.allocation_id} style={{ gridTemplateColumns: '1.2fr 1fr 1.2fr 0.8fr 1fr 1fr 1fr', borderLeft: `4px solid ${t.unrealized_pnl >= 0 ? 'var(--success)' : 'var(--danger)'}` }}>
+                                <div className="box-table-row current-row" key={t.allocation_id} style={{ gridTemplateColumns: '1.2fr 1fr 1.2fr 0.8fr 1fr 1fr 1fr', borderLeft: `4px solid ${t.unrealized_pnl >= 0 ? 'var(--success)' : 'var(--danger)'}` }}>
                                     <div className="box-table-cell">
                                         <span className="cell-label">Date</span>
                                         {formatDateTime(t.date)}
@@ -980,7 +967,7 @@ const AdminDashboard = () => {
                                 <div style={{ display: 'flex' }}>
                                     <input
                                         type="text"
-                                        placeholder="Search Symbol, Mobile, or ID..."
+                                        placeholder="Search User..."
                                         value={allocSearchInput}
                                         onChange={(e) => setAllocSearchInput(e.target.value)}
                                         onKeyDown={(e) => e.key === 'Enter' && setAllocSearch(allocSearchInput)}
@@ -1009,7 +996,7 @@ const AdminDashboard = () => {
                             </div>
                         </div>
                         <div className="box-table-container" style={{ overflowX: 'auto', paddingBottom: '1rem', fontSize: '0.8rem' }}>
-                            <div className="box-table-header" style={{ gridTemplateColumns: '1.4fr 1.2fr 1fr 0.7fr 0.8fr 1fr 0.8fr 1fr 1.4fr 0.7fr 0.8fr 1fr 0.8fr 1fr 1.1fr 0.8fr', minWidth: '1550px' }}>
+                            <div className="box-table-header" style={{ gridTemplateColumns: '1.2fr 1.2fr 1.4fr 0.7fr 0.8fr 1fr 0.8fr 1fr 1.4fr 0.7fr 0.8fr 1fr 0.8fr 1fr 1.1fr 0.8fr', minWidth: '1550px' }}>
                                 <div style={{ textAlign: 'center', borderRight: '1px solid rgba(255,255,255,0.1)', padding: '10px 5px' }} title="Date of Buy Trade" onClick={() => requestSort('buy_timestamp')}>DATE {sortConfig.key === 'buy_timestamp' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</div>
                                 <div style={{ textAlign: 'center', borderRight: '1px solid rgba(255,255,255,0.1)', padding: '10px 5px' }} title="Username (Hover for full name)" onClick={() => requestSort('user_name')}>NAME {sortConfig.key === 'user_name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</div>
                                 <div style={{ textAlign: 'center', borderRight: '1px solid rgba(255,255,255,0.1)', padding: '10px 5px' }} title="Trading Symbol (e.g. NIFTY, BANKNIFTY)" onClick={() => requestSort('master_trade_id.symbol')}>SYMBOL {sortConfig.key === 'master_trade_id.symbol' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</div>
@@ -1018,7 +1005,7 @@ const AdminDashboard = () => {
                                 <div style={{ textAlign: 'center', borderRight: '1px solid rgba(255,255,255,0.1)', padding: '10px 5px' }} title="Total Buy Value (Qty * Rate)">TOT_BUY</div>
                                 <div style={{ textAlign: 'center', borderRight: '1px solid rgba(255,255,255,0.1)', padding: '10px 5px' }} title="Buy Brokerage Charged">B_BROK</div>
                                 <div style={{ textAlign: 'center', borderRight: '1px solid rgba(255,255,255,0.1)', padding: '10px 5px' }} title="Net Buy Value (Total Buy + Buy Brokerage)">NBV</div>
-                                <div style={{ textAlign: 'center', borderRight: '1px solid rgba(255,255,255,0.1)', padding: '10px 5px' }} title="Closing Date and Time of the trade">SOLD DATE</div>
+                                <div style={{ textAlign: 'center', borderRight: '1px solid rgba(255,255,255,0.1)', padding: '10px 5px', cursor: 'pointer' }} title="Closing Date and Time of the trade" onClick={() => requestSort('sell_timestamp')}>SOLD DATE {sortConfig.key === 'sell_timestamp' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</div>
                                 <div style={{ textAlign: 'center', borderRight: '1px solid rgba(255,255,255,0.1)', padding: '10px 5px' }} title="Sell Quantity (Actual sold qty)">SELL_QTY</div>
                                 <div style={{ textAlign: 'center', borderRight: '1px solid rgba(255,255,255,0.1)', padding: '10px 5px' }} title="Sell Rate (Exit Price)">S_RATE</div>
                                 <div style={{ textAlign: 'center', borderRight: '1px solid rgba(255,255,255,0.1)', padding: '10px 5px' }} title="Total Sell Value (Qty * Exit Price)">TOT_SELL</div>
@@ -1041,7 +1028,7 @@ const AdminDashboard = () => {
                                 const sellBrokAmount = (a.sell_brokerage !== undefined && a.sell_brokerage !== 0) ? a.sell_brokerage : (isClosed ? (rawSellPriceTotal * (brokRate / 100)) : 0);
                                  const totalSell = isClosed ? (rawSellPriceTotal - sellBrokAmount) : 0;
                                        return (
-                                    <div className="box-table-row" key={a._id} style={{ gridTemplateColumns: '1.4fr 1.2fr 1fr 0.7fr 0.8fr 1fr 0.8fr 1fr 1.4fr 0.7fr 0.8fr 1fr 0.8fr 1fr 1.1fr 0.8fr', minWidth: '1550px', borderLeft: `4px solid ${isClosed ? (a.client_pnl >= 0 ? 'var(--success)' : 'var(--danger)') : 'var(--warning)'}`, marginBottom: '4px' }}>
+                                    <div className="box-table-row allocation-row" key={a._id} style={{ gridTemplateColumns: '1.2fr 1.2fr 1.4fr 0.7fr 0.8fr 1fr 0.8fr 1fr 1.4fr 0.7fr 0.8fr 1fr 0.8fr 1fr 1.1fr 0.8fr', minWidth: '1550px', borderLeft: `4px solid ${isClosed ? (a.client_pnl >= 0 ? 'var(--success)' : 'var(--danger)') : 'var(--warning)'}`, marginBottom: '4px' }}>
                                         <div className="box-table-cell" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', borderRight: '1px solid var(--border)', padding: '10px 5px' }}>
                                             <span className="cell-label">Date</span>
                                             {formatDateTime(a.buy_timestamp || a.createdAt)}
@@ -1113,7 +1100,7 @@ const AdminDashboard = () => {
                             {/* Summary Footer Row */}
                             {sortedAllocations.length > 0 && (
                                 <div className="box-table-row summary-row" style={{ 
-                                    gridTemplateColumns: '1.4fr 1.2fr 1fr 0.7fr 0.8fr 1fr 0.8fr 1fr 1.4fr 0.7fr 0.8fr 1fr 0.8fr 1fr 1.1fr 0.8fr', 
+                                    gridTemplateColumns: '1.2fr 1.2fr 1.4fr 0.7fr 0.8fr 1fr 0.8fr 1fr 1.4fr 0.7fr 0.8fr 1fr 0.8fr 1fr 1.1fr 0.8fr', 
                                     minWidth: '1550px', 
                                     backgroundColor: 'rgba(255,255,255,0.05)', 
                                     borderTop: '2px solid var(--primary)',
@@ -1174,16 +1161,16 @@ const AdminDashboard = () => {
                         </div>
                     </div>
                 );
-            case 'gl_ledger':
+            case 'realise_ledger':
                 return (
                     <div className="card">
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '10px' }}>
-                            <h2 style={{ fontSize: '1.2rem' }}>Global Ledger</h2>
+                            <h2 style={{ fontSize: '1.2rem' }}>Realise Ledger</h2>
                             <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                                 <div style={{ display: 'flex' }}>
                                     <input
                                         type="text"
-                                        placeholder="Search User, Mobile, Desc..."
+                                        placeholder="Search User..."
                                         value={ledgerSearchInput}
                                         onChange={(e) => setLedgerSearchInput(e.target.value)}
                                         onKeyDown={(e) => e.key === 'Enter' && setLedgerSearch(ledgerSearchInput)}
@@ -1212,7 +1199,7 @@ const AdminDashboard = () => {
                                 <div style={{ textAlign: 'center', padding: '10px 5px' }} onClick={() => requestSort('cls_balance')}>Closing Bal {sortConfig.key === 'cls_balance' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</div>
                             </div>
                             {sortedLedger.map(l => (
-                                <div className="box-table-row" key={l._id} style={{ 
+                                <div className="box-table-row ledger-row" key={l._id} style={{ 
                                     gridTemplateColumns: '1.2fr 1.2fr 1.5fr 1fr 1fr 1.2fr', 
                                     gap: '0', 
                                     borderLeft: '4px solid var(--primary)',
@@ -1251,11 +1238,16 @@ const AdminDashboard = () => {
             case 'rules':
                 return <Rules standalone={true} />;
             default:
+                const adminUser = users.find(u => u.role === 'admin');
+                const adminBalance = adminUser ? (adminUser.current_balance || 0) : 0;
+
                 const stats = {
                     totalUsers: users.filter(u => u.role !== 'admin').length,
                     activeTrades: masterTrades.filter(t => t.status === 'OPEN').length,
                     totalBalance: users.reduce((sum, u) => sum + (u.current_balance || 0), 0),
-                    totalAllocated: allocations.reduce((sum, a) => sum + (a.allocation_qty || 0), 0)
+                    totalAllocated: allocations.filter(a => a.status === 'OPEN').reduce((sum, a) => sum + (a.allocation_qty || 0), 0),
+                    navUser: (users.reduce((sum, u) => sum + (u.current_balance || 0), 0)) - adminBalance,
+                    totalBrokerage: adminBalance
                 };
 
                 return (
@@ -1279,6 +1271,15 @@ const AdminDashboard = () => {
                                     <div style={{ padding: '15px', background: 'var(--bg-card)', borderRadius: '8px', borderLeft: '3px solid var(--danger)' }}>
                                         <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Total Allocated Qty</div>
                                         <div style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>{stats.totalAllocated}</div>
+                                    </div>
+                                    {/* New Metrics Requested */}
+                                    <div style={{ padding: '15px', background: 'var(--bg-card)', borderRadius: '8px', borderLeft: '3px solid #8b5cf6' }}>
+                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>NAV User</div>
+                                        <div style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>₹ {stats.navUser.toLocaleString()}</div>
+                                    </div>
+                                    <div style={{ padding: '15px', background: 'var(--bg-card)', borderRadius: '8px', borderLeft: '3px solid #ec4899' }}>
+                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Total Brokerage</div>
+                                        <div style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>₹ {stats.totalBrokerage.toLocaleString()}</div>
                                     </div>
                                 </div>
                                 <p className="text-muted" style={{ marginTop: '20px', fontSize: '0.8rem', textAlign: 'center' }}>
@@ -1865,8 +1866,7 @@ const AdminDashboard = () => {
                 )}
 
                 {/* Render Active Tab Content */}
-
-                <div className="admin-tab-content">
+                <div className="admin-tab-content" key={activeTab}>
                    {renderContent()}
                 </div>
             </div>

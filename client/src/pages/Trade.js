@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import api from '../services/api';
 import Layout from '../components/Layout';
 import Loader from '../components/Loader';
+import { formatDate } from '../utils/dateFormatter';
 
 const Trades = () => {
     const [loading, setLoading] = useState(true);
@@ -19,7 +20,7 @@ const Trades = () => {
             try {
                 setLoading(true);
                 const { data } = await api.get('/trades/my-allocations/list');
-                setTrades(data);
+                setTrades(data.sort((a, b) => new Date(b.buy_timestamp) - new Date(a.buy_timestamp)));
                 setFilteredTrades(data);
             } catch (error) {
                 console.error("Error fetching trades:", error);
@@ -104,7 +105,7 @@ const Trades = () => {
                         <div className="box-table-row" key={t._id} style={{ gridTemplateColumns: 'minmax(120px, 1fr) 1.5fr 1fr 0.8fr 1fr 1.2fr 1fr' }}>
                             <div className="box-table-cell">
                                 <span className="cell-label">Date</span>
-                                {new Date(t.buy_timestamp).toLocaleDateString()}
+                                {formatDate(t.buy_timestamp)}
                             </div>
                             <div className="box-table-cell" style={{ fontWeight: '700' }}>
                                 <span className="cell-label">Script</span>

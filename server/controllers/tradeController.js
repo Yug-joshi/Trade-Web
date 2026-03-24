@@ -422,7 +422,8 @@ const triggerFlag = async (req, res) => {
 // @route   GET /api/trades
 const getTrades = async (req, res) => {
     try {
-        const trades = await Trade.find().sort({ createdAt: -1 });
+        // Explicitly filter for master trades (which don't have mob_num)
+        const trades = await Trade.find({ mob_num: { $exists: false } }).sort({ createdAt: -1 });
         res.status(200).json(trades);
     } catch (error) {
         res.status(500).json({ message: error.message });

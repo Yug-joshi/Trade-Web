@@ -10,8 +10,8 @@ const formatDate = (date) => {
     const d = new Date(date);
     const day = String(d.getDate()).padStart(2, '0');
     const month = String(d.getMonth() + 1).padStart(2, '0');
-    const year = String(d.getFullYear()).slice(-2);
-    return `${day}/${month}/${year}`;
+    const year = d.getFullYear();
+    return `${day}-${month}-${year}`;
 };
 
 const formatDateTime = (date) => {
@@ -19,10 +19,14 @@ const formatDateTime = (date) => {
     const d = new Date(date);
     const day = String(d.getDate()).padStart(2, '0');
     const month = String(d.getMonth() + 1).padStart(2, '0');
-    const year = String(d.getFullYear()).slice(-2);
-    const hours = String(d.getHours()).padStart(2, '0');
+    const year = String(d.getFullYear()).padStart(4, '0');
+    let hours = d.getHours();
     const minutes = String(d.getMinutes()).padStart(2, '0');
-    return `${day}/${month}/${year} ${hours}:${minutes}`;
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12;
+    hours = hours ? hours : 12; // the hour '0' should be '12'
+    const strTime = `${String(hours).padStart(2, '0')}:${minutes} ${ampm}`;
+    return `${day}-${month}-${year} ${strTime}`;
 };
 
 // @desc    Download User P&L Analysis Report (Excel)
@@ -91,7 +95,12 @@ const downloadPnLReport = async (req, res) => {
                 status: t.status
             });
         }
-        processedData.sort((a, b) => new Date(b.buy_date) - new Date(a.buy_date));
+        processedData.sort((a, b) => {
+            if (a.status === 'OPEN' && b.status !== 'OPEN') return -1;
+            if (a.status !== 'OPEN' && b.status === 'OPEN') return 1;
+            if (a.status === 'OPEN') return new Date(b.buy_date) - new Date(a.buy_date);
+            return new Date(b.sell_date) - new Date(a.sell_date);
+        });
 
         // Create Workbook
         const workbook = new ExcelJS.Workbook();
@@ -212,11 +221,19 @@ const downloadAdminReport = async (req, res) => {
         }
 
         const [trades, allocations, ledger, users] = await Promise.all([
-            Trade.find().sort({ createdAt: -1 }).lean(),
-            AllocationTrade.find().populate('master_trade_id', 'symbol').sort({ createdAt: -1 }).lean(),
+            Trade.find({ mob_num: { $exists: false } }).sort({ createdAt: -1 }).lean(),
+            AllocationTrade.find().populate('master_trade_id', 'symbol').lean(),
             LedgerEntry.find().sort({ entry_date: -1 }).lean(),
             User.find().lean()
         ]);
+
+        // Sort allocations: OPEN first, then by sell_timestamp desc (or buy_timestamp if open)
+        allocations.sort((a, b) => {
+            if (a.status === 'OPEN' && b.status !== 'OPEN') return -1;
+            if (a.status !== 'OPEN' && b.status === 'OPEN') return 1;
+            if (a.status === 'OPEN') return new Date(b.buy_timestamp) - new Date(a.buy_timestamp);
+            return new Date(b.sell_timestamp || b.updatedAt) - new Date(a.sell_timestamp || a.updatedAt);
+        });
 
         const userMap = {};
         users.forEach(u => userMap[u.mob_num] = u.user_name);

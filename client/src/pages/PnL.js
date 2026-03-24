@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import api from '../services/api';
 import Layout from '../components/Layout';
 import Loader from '../components/Loader';
+import { formatDateTime } from '../utils/dateFormatter';
 
 const PnL = () => {
     const [trades, setTrades] = useState([]);
@@ -54,8 +55,8 @@ const PnL = () => {
             const exitValue = t.exit_value || 0;
             const buyBrok = t.buy_brokerage || 0;
             const sellBrok = t.sell_brokerage || 0;
-            const pnl = t.client_pnl || 0;
-
+            const pnl = t.status === 'OPEN' ? ((t.current_value || totalValue) - (totalValue + buyBrok)) : (t.client_pnl || 0);
+            
             const cmp = t.status === 'OPEN' ? (qty > 0 ? ((t.current_value || totalValue) / qty) : 0) : '-';
             
             return {
@@ -74,7 +75,12 @@ const PnL = () => {
                 cmp: cmp,
                 pnl: pnl
             };
-        }).sort((a, b) => b.buy_date - a.buy_date);
+        }).sort((a, b) => {
+            if (a.status === 'OPEN' && b.status !== 'OPEN') return -1;
+            if (a.status !== 'OPEN' && b.status === 'OPEN') return 1;
+            if (a.status === 'OPEN') return b.buy_date - a.buy_date;
+            return b.sell_date - a.sell_date;
+        });
 
         let totalRealized = 0;
         let totalUnrealized = 0;
@@ -84,7 +90,10 @@ const PnL = () => {
         });
 
         openTrades.forEach(t => {
-            totalUnrealized += (t.client_pnl || 0);
+            const totalValue = t.total_value || (t.allocation_price * t.allocation_qty);
+            const inclusiveCost = totalValue + (t.buy_brokerage || 0);
+            const currentVal = t.current_value || totalValue;
+            totalUnrealized += (currentVal - inclusiveCost);
         });
 
         setTrades(combinedTableData);
@@ -126,16 +135,6 @@ const PnL = () => {
         setTrades(filtered);
     };
 
-    const formatDateTime = (date) => {
-        if (!date) return '-';
-        const d = new Date(date);
-        const day = String(d.getDate()).padStart(2, '0');
-        const month = String(d.getMonth() + 1).padStart(2, '0');
-        const year = String(d.getFullYear()).slice(-2);
-        const hours = String(d.getHours()).padStart(2, '0');
-        const minutes = String(d.getMinutes()).padStart(2, '0');
-        return `${day}/${month}/${year} ${hours}:${minutes}`;
-    };
 
     const downloadReport = async () => {
         try {
@@ -260,7 +259,7 @@ const PnL = () => {
                         <div style={{ textAlign: 'center', padding: '10px 5px' }}>Status</div>
                     </div>
                     {trades.map(trade => (
-                        <div className="box-table-row" key={trade.id} style={{ gridTemplateColumns: '1.4fr 1.1fr 0.8fr 0.9fr 1.1fr 1.4fr 0.8fr 0.9fr 1.1fr 1fr 1fr 1fr', minWidth: '1200px', borderLeft: `4px solid ${trade.status === 'CLOSED' ? (trade.pnl >= 0 ? 'var(--success)' : 'var(--danger)') : 'var(--warning)'}`, marginBottom: '4px' }}>
+                        <div className="box-table-row" key={trade.id} style={{ gridTemplateColumns: '1.4fr 1.1fr 0.8fr 0.9fr 1.1fr 1.4fr 0.8fr 0.9fr 1.1fr 1fr 1fr 1fr', minWidth: '1200px', borderLeft: `4px solid ${trade.pnl >= 0 ? 'var(--success)' : 'var(--danger)'}`, marginBottom: '4px' }}>
                             <div className="box-table-cell" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', borderRight: '1px solid var(--border)', padding: '10px 5px', fontSize: '0.8rem' }}>
                                 <span className="cell-label">Buy_Date</span>
                                 {formatDateTime(trade.buy_date)}
@@ -301,7 +300,7 @@ const PnL = () => {
                                 <span className="cell-label">CMP</span>
                                 {trade.cmp !== '-' ? `₹${Number(trade.cmp).toFixed(2)}` : '-'}
                             </div>
-                            <div className="box-table-cell font-mono" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', borderRight: '1px solid var(--border)', padding: '10px 5px', fontWeight: '800', color: trade.status === 'CLOSED' ? (trade.pnl >= 0 ? 'var(--success)' : 'var(--danger)') : 'var(--warning)' }}>
+                            <div className="box-table-cell font-mono" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', borderRight: '1px solid var(--border)', padding: '10px 5px', fontWeight: '800', color: trade.pnl >= 0 ? 'var(--success)' : 'var(--danger)' }}>
                                 <span className="cell-label">P&L</span>
                                 {trade.pnl > 0 ? '+' : ''}{Number(trade.pnl).toLocaleString()}
                             </div>
